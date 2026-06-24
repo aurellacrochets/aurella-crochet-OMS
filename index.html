@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurella OMS</title>
+<style>
+/* ─── TOKENS ─────────────────────────────────────────────── */
+:root {
+  --bg:       #0f0f11;
+  --surface:  #18181c;
+  --surface2: #22222a;
+  --border:   #2e2e38;
+  --accent:   #c084fc;
+  --accent2:  #f0abfc;
+  --green:    #4ade80;
+  --red:      #f87171;
+  --yellow:   #fbbf24;
+  --blue:     #60a5fa;
+  --orange:   #fb923c;
+  --text:     #e8e8f0;
+  --muted:    #888899;
+  --sidebar:  200px;
+  --radius:   8px;
+  --radius-sm:4px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* ─── RESET ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; font-size: 14px; line-height: 1.5; }
+button { cursor: pointer; font-family: inherit; font-size: 14px; border: none; outline: none; }
+input, select, textarea { font-family: inherit; font-size: 14px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 8px 12px; width: 100%; outline: none; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+input.invalid { border-color: var(--red) !important; }
+select option { background: var(--surface2); }
+a { color: var(--accent); text-decoration: none; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; background: var(--surface); }
+tr:hover td { background: var(--surface2); }
+h2 { font-size: 20px; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ─── LAYOUT ─────────────────────────────────────────────── */
+#sidebar { width: var(--sidebar); min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; z-index: 100; }
+#main { margin-left: var(--sidebar); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+.page { display: none; flex-direction: column; padding: 28px 32px; flex: 1; }
+.page.active { display: flex; }
+
+/* ─── SIDEBAR ─────────────────────────────────────────────── */
+.sidebar-logo { padding: 20px 18px 16px; border-bottom: 1px solid var(--border); }
+.sidebar-logo .brand { font-size: 17px; font-weight: 700; color: var(--accent2); letter-spacing: -.3px; }
+.sidebar-logo .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.nav { flex: 1; padding: 12px 0; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 18px; color: var(--muted); cursor: pointer; font-size: 13.5px; font-weight: 500; border-left: 3px solid transparent; transition: all .15s; }
+.nav-item:hover { color: var(--text); background: var(--surface2); }
+.nav-item.active { color: var(--accent2); border-left-color: var(--accent); background: rgba(192,132,252,.07); }
+.nav-item.danger-nav { color: #f87171aa; }
+.nav-item.danger-nav:hover { color: var(--red); background: #2a101033; }
+.nav-item.danger-nav.active { color: var(--red); border-left-color: var(--red); background: rgba(248,113,113,.07); }
+.nav-item svg { flex-shrink: 0; }
+.sidebar-footer { padding: 14px 18px; border-top: 1px solid var(--border); }
+.api-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.dot.green { background: var(--green); }
+.dot.red { background: var(--red); }
+.dot.yellow { background: var(--yellow); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ─── PAGE HEADER ────────────────────────────────────────── */
+.page-header { margin-bottom: 24px; }
+.page-header h2 { margin-bottom: 4px; }
+.page-header p { color: var(--muted); font-size: 13px; }
+
+/* ─── CARDS ──────────────────────────────────────────────── */
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+.card-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 500; }
+.card-value { font-size: 28px; font-weight: 700; color: var(--text); }
+.card-value.accent { color: var(--accent2); }
+.card-value.green  { color: var(--green); }
+.card-value.red    { color: var(--red); }
+.card-value.yellow { color: var(--yellow); }
+.card-value.blue   { color: var(--blue); }
+.card-value.orange { color: var(--orange); }
+
+/* ─── BUTTONS ────────────────────────────────────────────── */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-sm); font-weight: 500; transition: opacity .15s, background .15s; }
+.btn:hover { opacity: .85; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-danger { background: #3f1212; color: var(--red); border: 1px solid #7f2020; }
+.btn-success { background: #0f3020; color: var(--green); border: 1px solid #1a5035; }
+.btn-icon { padding: 7px; border-radius: var(--radius-sm); background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+.btn-icon:hover { color: var(--text); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+/* ─── BADGES ─────────────────────────────────────────────── */
+.badge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.badge-confirmed   { background: #1a2a4a; color: var(--blue); }
+.badge-inprogress  { background: #2a1a00; color: var(--yellow); }
+.badge-ready       { background: #1a0f2e; color: var(--accent2); }
+.badge-intransit   { background: #1a2a1a; color: var(--green); }
+.badge-delivered   { background: #0a2010; color: #6ee7b7; }
+.badge-rto         { background: #2a1a1a; color: var(--orange); }
+.badge-cancelled   { background: #2a1010; color: var(--red); }
+.badge-paid        { background: #0a2010; color: var(--green); }
+.badge-unpaid      { background: #2a1010; color: var(--red); }
+.badge-handover    { background: #1a1a2a; color: #a78bfa; }
+.badge-pickup      { background: #1a2a2a; color: #67e8f9; }
+.badge-shipping    { background: #1a1a1a; color: var(--muted); }
+
+/* ─── SEARCH & FILTERS ───────────────────────────────────── */
+.filter-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.search-wrap { position: relative; flex: 1; min-width: 200px; }
+.search-wrap input { padding-left: 34px; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.filter-row select { max-width: 160px; }
+
+/* ─── TABS ───────────────────────────────────────────────── */
+.tabs { display: flex; gap: 2px; margin-bottom: 16px; background: var(--surface); border-radius: var(--radius); padding: 4px; width: fit-content; flex-wrap: wrap; }
+.tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; transition: all .15s; }
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--surface2); color: var(--accent2); }
+
+/* ─── TABLE ──────────────────────────────────────────────── */
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; }
+.table-empty { padding: 48px; text-align: center; color: var(--muted); }
+.order-row { cursor: pointer; }
+.order-row td:first-child { font-family: monospace; font-size: 12px; color: var(--accent2); }
+.awb-link { color: var(--blue); font-family: monospace; font-size: 11px; text-decoration: underline; cursor: pointer; }
+.awb-link:hover { color: var(--accent2); }
+.courier-cell { font-size: 12px; line-height: 1.8; }
+
+/* ─── FORMS ──────────────────────────────────────────────── */
+.form-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.form-section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 16px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1/-1; }
+.form-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.form-label .req { color: var(--red); margin-left: 2px; }
+.form-label .opt { color: var(--muted); font-weight: 400; font-size: 11px; }
+.form-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+.field-hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ─── PRODUCTS ROW ───────────────────────────────────────── */
+.products-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.product-row { display: flex; gap: 8px; align-items: center; }
+.product-row .btn-icon { flex-shrink: 0; }
+.product-autocomplete { position: relative; flex: 4; min-width: 0; }
+.prod-qty-wrap { flex: 1; min-width: 60px; }
+.prod-price-wrap { flex: 1.5; min-width: 80px; position: relative; }
+.prod-price-wrap input { padding-left: 22px; }
+.rupee-symbol { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
+.autocomplete-dropdown { position: absolute; top: 100%; left: 0; right: 0; z-index: 200; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); max-height: 160px; overflow-y: auto; display: none; }
+.autocomplete-dropdown.open { display: block; }
+.autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: 13px; }
+.autocomplete-item:hover { background: var(--surface); color: var(--accent2); }
+.products-header { display: flex; gap: 8px; padding: 0 0 6px; margin-bottom: 2px; }
+.products-header span { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.ph-name  { flex: 4; }
+.ph-qty   { flex: 1; min-width: 60px; }
+.ph-price { flex: 1.5; min-width: 80px; }
+.ph-del   { width: 34px; flex-shrink: 0; }
+.order-total-row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+.order-total-val { font-size: 16px; font-weight: 700; color: var(--accent2); }
+
+/* ─── ORDER DETAIL ───────────────────────────────────────── */
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.detail-block { display: flex; flex-direction: column; gap: 4px; }
+.detail-key { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 500; }
+.detail-val { font-size: 14px; color: var(--text); }
+.product-table-mini { background: var(--surface2); border-radius: var(--radius-sm); overflow: hidden; }
+.product-table-mini th, .product-table-mini td { padding: 8px 12px; font-size: 13px; }
+.action-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.back-btn { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; cursor: pointer; margin-bottom: 16px; }
+.back-btn:hover { color: var(--text); }
+
+/* ─── ACTIVITY LOG ───────────────────────────────────────── */
+.log-list { display: flex; flex-direction: column; gap: 0; }
+.log-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.log-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
+.log-text { font-size: 13px; color: var(--text); }
+.log-time { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ─── BULK CSV ───────────────────────────────────────────── */
+.csv-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 32px; text-align: center; cursor: pointer; transition: border-color .15s; color: var(--muted); }
+.csv-zone:hover, .csv-zone.drag { border-color: var(--accent); color: var(--accent2); }
+.csv-preview { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; max-height: 320px; margin-top: 16px; }
+.preview-stats { display: flex; gap: 16px; margin: 12px 0; flex-wrap: wrap; }
+.stat-chip { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.stat-new    { background: #0f3020; color: var(--green); }
+.stat-skip   { background: #2a1a00; color: var(--yellow); }
+.stat-notfound { background: #2a1010; color: var(--red); }
+.stat-update { background: #1a2a4a; color: var(--blue); }
+
+/* ─── TOAST ──────────────────────────────────────────────── */
+#toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+.toast { padding: 12px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 500; background: var(--surface2); border: 1px solid var(--border); animation: slideUp .2s ease; max-width: 320px; }
+.toast.success { border-color: var(--green); color: var(--green); }
+.toast.error   { border-color: var(--red); color: var(--red); }
+.toast.info    { border-color: var(--accent); color: var(--accent2); }
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ─── MODAL ──────────────────────────────────────────────── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 500; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 480px; width: 90%; max-height: 80vh; overflow-y: auto; }
+.modal h3 { margin-bottom: 16px; }
+.modal-danger { border-color: #7f2020; }
+.modal-danger h3 { color: var(--red); }
+.delete-order-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; margin: 14px 0; font-size: 13px; line-height: 1.8; }
+.delete-order-card strong { color: var(--accent2); font-family: monospace; }
+
+/* ─── DELETE PAGE ────────────────────────────────────────── */
+.delete-search-wrap { position: relative; margin-bottom: 16px; }
+.delete-search-wrap input { padding-left: 34px; }
+.delete-list { display: flex; flex-direction: column; gap: 8px; }
+.delete-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.delete-item-info { flex: 1; min-width: 0; }
+.delete-item-id { font-family: monospace; font-size: 12px; color: var(--accent2); }
+.delete-item-name { font-size: 13px; font-weight: 500; margin-top: 2px; }
+.delete-item-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.danger-zone-notice { background: #1a0808; border: 1px solid #5a1a1a; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 20px; font-size: 13px; color: #f8717199; line-height: 1.7; }
+
+/* ─── QUICK ACTIONS ──────────────────────────────────────── */
+.quick-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+.quick-action { padding: 10px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted); transition: all .15s; }
+.quick-action:hover { color: var(--accent2); border-color: var(--accent); }
+
+/* ─── CONFIG ─────────────────────────────────────────────── */
+.config-notice { background: #1a1a2e; border: 1px solid #2e2e5e; border-radius: var(--radius); padding: 16px; margin-bottom: 20px; font-size: 13px; color: #a0a0c8; line-height: 1.7; }
+.config-notice code { background: var(--surface2); padding: 2px 6px; border-radius: 3px; font-family: monospace; color: var(--accent2); }
+
+/* ─── LOADING ────────────────────────────────────────────── */
+.spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── RESPONSIVE ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  :root { --sidebar: 0px; }
+  #sidebar { transform: translateX(-200px); transition: transform .25s; }
+  #sidebar.open { transform: translateX(0); width: 200px; }
+  #main { margin-left: 0; }
+  .page { padding: 16px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .form-grid.three { grid-template-columns: 1fr; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .cards-grid { grid-template-columns: repeat(2, 1fr); }
+  #mobile-header { display: flex; }
+}
+#mobile-header { display: none; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 90; }
+.hamburger { background: none; color: var(--text); padding: 4px; }
+.hamburger svg { display: block; }
+
+.section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+.tbl-link { color: var(--accent2); cursor: pointer; font-family: monospace; font-size: 12px; }
+.tbl-link:hover { text-decoration: underline; }
+.amount-cell { font-size: 13px; font-weight: 600; color: var(--accent2); font-family: monospace; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">✦ Aurella</div>
+    <div class="sub">Order Management</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" data-page="overview">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Overview
+    </div>
+    <div class="nav-item" data-page="orders">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+      All Orders
+    </div>
+    <div class="nav-item" data-page="neworder">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      New Order
+    </div>
+    <div class="nav-item" data-page="bulkcreate">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/><path d="M5 19h14"/></svg>
+      Bulk Create
+    </div>
+    <div class="nav-item" data-page="bulkedit">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Bulk Edit
+    </div>
+    <div class="nav-item danger-nav" data-page="deleteorders">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+      Delete Orders
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="api-status">
+      <div class="dot yellow" id="api-dot"></div>
+      <span id="api-label">Connecting…</span>
+    </div>
+    <div style="margin-top:10px;">
+      <button class="btn btn-secondary btn-sm" onclick="showConfig()" style="width:100%">⚙ Configure API</button>
+    </div>
+  </div>
+</aside>
+
+<!-- MOBILE HEADER -->
+<div id="mobile-header">
+  <button class="hamburger" onclick="toggleSidebar()">
+    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+  </button>
+  <span style="font-weight:700;color:var(--accent2)">✦ Aurella OMS</span>
+</div>
+
+<main id="main">
+
+<!-- ═══ OVERVIEW ═════════════════════════════════════════════ -->
+<section class="page active" id="page-overview">
+  <div class="page-header">
+    <h2>Overview</h2>
+    <p>Live snapshot of Aurella orders</p>
+  </div>
+  <div class="cards-grid">
+    <div class="card"><div class="card-label">Total Orders</div><div class="card-value accent" id="stat-total">—</div></div>
+    <div class="card"><div class="card-label">Confirmed</div><div class="card-value blue" id="stat-confirmed">—</div></div>
+    <div class="card"><div class="card-label">In Progress</div><div class="card-value yellow" id="stat-inprogress">—</div></div>
+    <div class="card"><div class="card-label">Ready</div><div class="card-value" style="color:var(--accent2)" id="stat-ready">—</div></div>
+    <div class="card"><div class="card-label">In Transit</div><div class="card-value green" id="stat-intransit">—</div></div>
+    <div class="card"><div class="card-label">Delivered</div><div class="card-value" style="color:#6ee7b7" id="stat-delivered">—</div></div>
+    <div class="card"><div class="card-label">RTO</div><div class="card-value orange" id="stat-rto">—</div></div>
+    <div class="card"><div class="card-label">Cancelled</div><div class="card-value red" id="stat-cancelled">—</div></div>
+    <div class="card"><div class="card-label">Paid</div><div class="card-value green" id="stat-paid">—</div></div>
+    <div class="card"><div class="card-label">Unpaid</div><div class="card-value red" id="stat-unpaid">—</div></div>
+  </div>
+  <div class="quick-actions">
+    <div class="quick-action" onclick="navigate('neworder')">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      Add New Order
+    </div>
+    <div class="quick-action" onclick="filterAndGo('In Transit')">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      In Transit
+    </div>
+    <div class="quick-action" onclick="filterAndGo('','Not Paid')">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      Unpaid Orders
+    </div>
+    <div class="quick-action" onclick="filterAndGo('Ready')">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+      Ready Orders
+    </div>
+    <div class="quick-action" onclick="loadData()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      Refresh
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">Recent Orders <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--muted)">Last 10</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Order ID</th><th>Customer</th><th>Status</th><th>Payment</th><th>Updated</th></tr></thead>
+        <tbody id="recent-orders-body"><tr><td colspan="5" class="table-empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ALL ORDERS ════════════════════════════════════════════ -->
+<section class="page" id="page-orders">
+  <div class="page-header">
+    <h2>All Orders</h2>
+    <p>Search, filter, and manage every order</p>
+  </div>
+  <div class="tabs" id="status-tabs">
+    <div class="tab active" data-status="">All</div>
+    <div class="tab" data-status="Confirmed">Confirmed</div>
+    <div class="tab" data-status="In Progress">In Progress</div>
+    <div class="tab" data-status="Ready">Ready</div>
+    <div class="tab" data-status="In Transit">In Transit</div>
+    <div class="tab" data-status="Delivered">Delivered</div>
+    <div class="tab" data-status="RTO - In Transit">RTO</div>
+    <div class="tab" data-status="Cancelled">Cancelled</div>
+  </div>
+  <div class="filter-row">
+    <div class="search-wrap">
+      <span class="search-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span>
+      <input type="text" id="orders-search" placeholder="Search by ID, name, phone, AWB, pincode…" oninput="renderOrdersTable()">
+    </div>
+    <select id="filter-payment" onchange="renderOrdersTable()">
+      <option value="">All Payments</option>
+      <option value="Paid">Paid</option>
+      <option value="Not Paid">Not Paid</option>
+    </select>
+    <select id="filter-delivery" onchange="renderOrdersTable()">
+      <option value="">All Delivery</option>
+      <option value="Handover">Handover</option>
+      <option value="Pickup">Pickup</option>
+      <option value="Shipping">Shipping</option>
+    </select>
+    <button class="btn btn-secondary btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Order ID</th><th>Customer</th><th>Phone</th><th>Amount</th><th>Payment</th><th>Status</th><th>Courier / AWB</th><th>Updated</th></tr></thead>
+      <tbody id="orders-table-body"><tr><td colspan="8" class="table-empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div id="orders-count" style="margin-top:10px;color:var(--muted);font-size:12px;"></div>
+</section>
+
+<!-- ═══ ORDER DETAIL ══════════════════════════════════════════ -->
+<section class="page" id="page-detail">
+  <div class="back-btn" onclick="navigate('orders')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Back to All Orders
+  </div>
+  <div class="action-bar">
+    <button class="btn btn-primary" id="edit-btn" onclick="enterEditMode()">✎ Edit Order</button>
+    <button class="btn btn-success" id="save-btn" onclick="saveOrder()" style="display:none">✓ Save Changes</button>
+    <button class="btn btn-secondary" id="cancel-btn" onclick="cancelEdit()" style="display:none">✕ Cancel</button>
+    <button class="btn btn-secondary" onclick="copyAddress()">⊞ Copy Address</button>
+    <button class="btn btn-secondary" onclick="copyPhone()">📞 Copy Phone</button>
+    <button class="btn btn-secondary" onclick="openWhatsapp()">💬 WhatsApp</button>
+  </div>
+  <div id="detail-content"></div>
+</section>
+
+<!-- ═══ NEW ORDER ═════════════════════════════════════════════ -->
+<section class="page" id="page-neworder">
+  <div class="page-header">
+    <h2>New Order</h2>
+    <p>Create a new order manually</p>
+  </div>
+  <form id="new-order-form" onsubmit="submitNewOrder(event)">
+  <div class="form-section">
+    <div class="form-section-title">Order Info</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Order ID <span class="req">*</span></label>
+        <input type="text" id="no-id" placeholder="AUR-0001" required>
+        <span class="field-hint" id="order-id-hint"></span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Order Status</label>
+        <select id="no-status">
+          <option>Confirmed</option><option>In Progress</option><option>Ready</option>
+          <option>In Transit</option><option>Delivered</option><option>RTO - In Transit</option><option>Cancelled</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Customer Info</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Customer Name <span class="req">*</span></label>
+        <input type="text" id="no-name" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number <span class="req">*</span></label>
+        <input type="text" id="no-phone" inputmode="numeric" maxlength="10" placeholder="10-digit number" oninput="digitsOnly(this,10)" required>
+        <span class="field-hint">Numbers only · exactly 10 digits</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email Address <span class="opt">(optional)</span></label>
+        <input type="email" id="no-email" placeholder="customer@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Pincode <span class="req">*</span></label>
+        <input type="text" id="no-pincode" inputmode="numeric" maxlength="6" placeholder="6-digit pincode" oninput="digitsOnly(this,6)" required>
+        <span class="field-hint">Numbers only · exactly 6 digits</span>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Address <span class="req">*</span></label>
+        <textarea id="no-address" rows="2" required></textarea>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Landmark <span class="opt">(optional)</span></label>
+        <input type="text" id="no-landmark">
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Delivery & Payment</div>
+    <div class="form-grid three">
+      <div class="form-group">
+        <label class="form-label">Delivery Type <span class="req">*</span></label>
+        <select id="no-delivery" onchange="toggleShippingFields('no')">
+          <option>Handover</option><option>Pickup</option><option>Shipping</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Status</label>
+        <select id="no-payment">
+          <option value="Not Paid">Not Paid</option><option value="Paid">Paid</option>
+        </select>
+      </div>
+      <div class="form-group" id="no-courier-group" style="display:none">
+        <label class="form-label">Courier <span class="req">*</span></label>
+        <input type="text" id="no-courier" placeholder="Delhivery, DTDC…">
+      </div>
+      <div class="form-group" id="no-awb-group" style="display:none">
+        <label class="form-label">AWB Number <span class="req">*</span></label>
+        <input type="text" id="no-awb">
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Products</div>
+    <div class="products-header">
+      <span class="ph-name">Product Name <span style="color:var(--red)">*</span></span>
+      <span class="ph-qty">Qty <span style="color:var(--red)">*</span></span>
+      <span class="ph-price">Price (₹) <span style="color:var(--red)">*</span></span>
+      <span class="ph-del"></span>
+    </div>
+    <div class="products-list" id="no-products-list"></div>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="addProductRow('no')">+ Add Product</button>
+    <div class="order-total-row">
+      Order Total: <span class="order-total-val" id="no-order-total">₹0</span>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary" id="new-order-submit">Create Order</button>
+    <button type="button" class="btn btn-secondary" onclick="resetNewOrderForm()">Reset</button>
+  </div>
+  </form>
+</section>
+
+<!-- ═══ BULK CREATE ═══════════════════════════════════════════ -->
+<section class="page" id="page-bulkcreate">
+  <div class="page-header">
+    <h2>Bulk Create</h2>
+    <p>Upload a CSV to create multiple orders at once</p>
+  </div>
+  <div class="config-notice">
+    <strong>CSV Format:</strong><br>
+    <code>Order ID,Customer Name,Phone Number,Address,Landmark,Pincode,Delivery Type,Payment Status,Order Status,Product Name,Quantity,Price</code><br><br>
+    One row per product. Repeat order-level fields for each product row. Orders with existing IDs will be <strong>skipped</strong>.
+    <div style="margin-top:10px;"><button class="btn btn-secondary btn-sm" onclick="downloadBulkCreateTemplate()">↓ Download Template</button></div>
+  </div>
+  <div class="csv-zone" id="bc-zone" onclick="document.getElementById('bc-file').click()"
+       ondragover="event.preventDefault();this.classList.add('drag')"
+       ondragleave="this.classList.remove('drag')"
+       ondrop="handleCSVDrop(event,'bc')">
+    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 8px;display:block"><path d="M12 19V5M5 12l7-7 7 7"/><path d="M5 19h14"/></svg>
+    Click to upload or drag & drop a CSV file
+  </div>
+  <input type="file" id="bc-file" accept=".csv" style="display:none" onchange="handleCSVFile(event,'bc')">
+  <div id="bc-preview-section" style="display:none">
+    <div class="preview-stats" id="bc-stats"></div>
+    <div class="csv-preview" id="bc-preview-table"></div>
+    <div class="form-actions" style="margin-top:12px">
+      <button class="btn btn-primary" onclick="applyBulkCreate()">✓ Apply & Create Orders</button>
+      <button class="btn btn-secondary" onclick="clearCSV('bc')">✕ Clear</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ BULK EDIT ═════════════════════════════════════════════ -->
+<section class="page" id="page-bulkedit">
+  <div class="page-header">
+    <h2>Bulk Edit</h2>
+    <p>Update existing orders via CSV — only non-empty fields are updated</p>
+  </div>
+  <div class="config-notice">
+    <strong>CSV Format:</strong><br>
+    <code>Order ID,Customer Name,Phone Number,Address,Landmark,Pincode,Delivery Type,Courier,AWB Number,Payment Status,Order Status</code><br><br>
+    Leave any column <strong>empty</strong> to keep the existing value. Order ID is required.
+    <div style="margin-top:10px;"><button class="btn btn-secondary btn-sm" onclick="downloadBulkEditTemplate()">↓ Download Template</button></div>
+  </div>
+  <div class="csv-zone" id="be-zone" onclick="document.getElementById('be-file').click()"
+       ondragover="event.preventDefault();this.classList.add('drag')"
+       ondragleave="this.classList.remove('drag')"
+       ondrop="handleCSVDrop(event,'be')">
+    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 8px;display:block"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Click to upload or drag & drop a CSV file
+  </div>
+  <input type="file" id="be-file" accept=".csv" style="display:none" onchange="handleCSVFile(event,'be')">
+  <div id="be-preview-section" style="display:none">
+    <div class="preview-stats" id="be-stats"></div>
+    <div class="csv-preview" id="be-preview-table"></div>
+    <div class="form-actions" style="margin-top:12px">
+      <button class="btn btn-primary" onclick="applyBulkEdit()">✓ Apply Updates</button>
+      <button class="btn btn-secondary" onclick="clearCSV('be')">✕ Clear</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DELETE ORDERS ═════════════════════════════════════════ -->
+<section class="page" id="page-deleteorders">
+  <div class="page-header">
+    <h2 style="color:var(--red)">Delete Orders</h2>
+    <p>Permanently remove orders from the system</p>
+  </div>
+  <div class="danger-zone-notice">
+    ⚠ Deletions are <strong>permanent and cannot be undone</strong>. Each deletion requires confirmation. Use with caution.
+  </div>
+  <div class="delete-search-wrap">
+    <span class="search-icon" style="left:10px;top:50%;transform:translateY(-50%);position:absolute;color:var(--muted)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+    </span>
+    <input type="text" id="delete-search" placeholder="Search orders to delete…" oninput="renderDeleteList()" style="padding-left:34px">
+  </div>
+  <div class="delete-list" id="delete-list"></div>
+</section>
+
+</main>
+
+<!-- CONFIG MODAL -->
+<div class="modal-overlay" id="config-modal">
+  <div class="modal">
+    <h3>⚙ API Configuration</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Enter the URL of your deployed Google Apps Script web app.</p>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Apps Script URL</label>
+      <input type="url" id="config-url" placeholder="https://script.google.com/macros/s/…/exec">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveConfig()">Save & Test</button>
+      <button class="btn btn-secondary" onclick="closeConfig()">Cancel</button>
+    </div>
+    <div id="config-test-result" style="margin-top:12px;font-size:13px;"></div>
+    <details style="margin-top:20px">
+      <summary style="cursor:pointer;color:var(--muted);font-size:12px">Setup instructions</summary>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);line-height:1.8">
+        1. Open your Google Sheet → Extensions → Apps Script<br>
+        2. Paste the contents of Code.gs<br>
+        3. Deploy → New deployment → Web App<br>
+        4. Set access to "Anyone"<br>
+        5. Copy the URL and paste above
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- DELETE CONFIRMATION MODAL -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal modal-danger">
+    <h3>⚠ Confirm Deletion</h3>
+    <p style="color:var(--muted);font-size:13px;">This action is permanent and cannot be undone.</p>
+    <div class="delete-order-card" id="delete-modal-info"></div>
+    <p style="font-size:13px;margin-bottom:16px;">Are you sure you want to delete this order and all its items?</p>
+    <div class="form-actions">
+      <button class="btn btn-danger" id="delete-confirm-btn" onclick="confirmDelete()">Delete Permanently</button>
+      <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// HELPERS — input guards
+// ═══════════════════════════════════════════════════════════
+function digitsOnly(input, maxLen) {
+  // Remove any non-digit character as the user types
+  const pos = input.selectionStart;
+  const before = input.value;
+  input.value = before.replace(/\D/g, '').slice(0, maxLen);
+  // Restore cursor if chars were stripped
+  if (input.value.length !== before.length) {
+    const diff = before.length - input.value.length;
+    input.setSelectionRange(Math.max(0, pos - diff), Math.max(0, pos - diff));
+  }
+  recalcTotal();
+}
+
+// Prevent non-digit keypress entirely on numeric-only fields
+function numericKeydown(e) {
+  const allowed = ['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'];
+  if (allowed.includes(e.key)) return;
+  if (e.ctrlKey || e.metaKey) return; // allow copy/paste shortcuts
+  if (!/^\d$/.test(e.key)) e.preventDefault();
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let API_URL = localStorage.getItem('aurella_api') || '';
+let allOrders = [];
+let allItems  = [];
+let currentOrder = null;
+let activeStatusFilter = '';
+let pendingBcData = null;
+let pendingBeData = null;
+let productNames  = [];
+let orderToDelete = null;
+
+// ═══════════════════════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════════════════════
+async function api(action, payload = {}) {
+  if (!API_URL) throw new Error('API not configured');
+  const params = new URLSearchParams({ action, ...payload });
+  const res = await fetch(`${API_URL}?${params}`);
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json;
+}
+async function apiPost(action, payload = {}) {
+  if (!API_URL) throw new Error('API not configured');
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...payload })
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json;
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOAD DATA
+// ═══════════════════════════════════════════════════════════
+async function loadData() {
+  setApiStatus('loading');
+  try {
+    const [ordersRes, itemsRes] = await Promise.all([api('getOrders'), api('getItems')]);
+    allOrders = ordersRes.data || [];
+    allItems  = itemsRes.data || [];
+    productNames = [...new Set(allItems.map(i => i.ProductName).filter(Boolean))];
+    renderOverview(); renderOrdersTable(); renderDeleteList();
+    setApiStatus('ok');
+  } catch(e) {
+    setApiStatus('err');
+    loadDemoData();
+  }
+}
+
+function loadDemoData() {
+  const now = new Date().toISOString();
+  allOrders = [
+    { OrderID:'AUR-0001', CustomerName:'Priya Sharma', Email:'priya@email.com', Phone:'9876543210', Address:'12 Rose Street, HSR Layout', Landmark:'Near Park', Pincode:'560102', DeliveryType:'Shipping', Courier:'Delhivery', AWB:'DEL123456', PaymentStatus:'Paid', OrderStatus:'In Transit', CreatedAt:now, UpdatedAt:now },
+    { OrderID:'AUR-0002', CustomerName:'Anita Gupta', Email:'', Phone:'9123456789', Address:'45 MG Road, Bengaluru', Landmark:'', Pincode:'560001', DeliveryType:'Handover', Courier:'', AWB:'', PaymentStatus:'Not Paid', OrderStatus:'Confirmed', CreatedAt:now, UpdatedAt:now },
+    { OrderID:'AUR-0003', CustomerName:'Megha Rao', Email:'megha@gmail.com', Phone:'8765432109', Address:'7 Lotus Lane, Koramangala', Landmark:'Near Metro', Pincode:'560034', DeliveryType:'Pickup', Courier:'', AWB:'', PaymentStatus:'Paid', OrderStatus:'Ready', CreatedAt:now, UpdatedAt:now },
+    { OrderID:'AUR-0004', CustomerName:'Divya Jain', Email:'', Phone:'7654321098', Address:'22 Temple Road, Jayanagar', Landmark:'Opp Church', Pincode:'560041', DeliveryType:'Shipping', Courier:'DTDC', AWB:'DTDC789', PaymentStatus:'Not Paid', OrderStatus:'In Progress', CreatedAt:now, UpdatedAt:now },
+    { OrderID:'AUR-0005', CustomerName:'Kavya Nair', Email:'kavya@yahoo.com', Phone:'9988776655', Address:'1 Beach Ave, Indiranagar', Landmark:'', Pincode:'560038', DeliveryType:'Handover', Courier:'', AWB:'', PaymentStatus:'Paid', OrderStatus:'Delivered', CreatedAt:now, UpdatedAt:now },
+  ];
+  allItems = [
+    { OrderID:'AUR-0001', ProductName:'Chunky Bag', Quantity:1, Price:850 },
+    { OrderID:'AUR-0001', ProductName:'Sunflower Clip', Quantity:3, Price:120 },
+    { OrderID:'AUR-0002', ProductName:'Tote Bag', Quantity:1, Price:650 },
+    { OrderID:'AUR-0003', ProductName:'Bucket Hat', Quantity:2, Price:450 },
+    { OrderID:'AUR-0003', ProductName:'Hair Clip Set', Quantity:1, Price:200 },
+    { OrderID:'AUR-0004', ProductName:'Chunky Bag', Quantity:1, Price:850 },
+    { OrderID:'AUR-0005', ProductName:'Plushie Frog', Quantity:2, Price:380 },
+  ];
+  productNames = [...new Set(allItems.map(i => i.ProductName))];
+  renderOverview(); renderOrdersTable(); renderDeleteList();
+  toast('Running in demo mode — connect your Apps Script API to save data', 'info');
+}
+
+function setApiStatus(s) {
+  const dot = document.getElementById('api-dot');
+  const lbl = document.getElementById('api-label');
+  if (s==='ok')      { dot.className='dot green';  lbl.textContent='Connected'; }
+  else if (s==='err'){ dot.className='dot red';    lbl.textContent='No API'; }
+  else               { dot.className='dot yellow'; lbl.textContent='Connecting…'; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ORDER AMOUNT HELPER
+// ═══════════════════════════════════════════════════════════
+function orderAmount(orderId) {
+  const items = allItems.filter(i => i.OrderID === orderId);
+  return items.reduce((sum, i) => sum + (parseFloat(i.Price)||0) * (parseInt(i.Quantity)||1), 0);
+}
+
+function fmtAmount(n) {
+  return '₹' + n.toLocaleString('en-IN');
+}
+
+// ═══════════════════════════════════════════════════════════
+// OVERVIEW
+// ═══════════════════════════════════════════════════════════
+function renderOverview() {
+  const s = st => allOrders.filter(o => o.OrderStatus === st).length;
+  document.getElementById('stat-total').textContent = allOrders.length;
+  document.getElementById('stat-confirmed').textContent = s('Confirmed');
+  document.getElementById('stat-inprogress').textContent = s('In Progress');
+  document.getElementById('stat-ready').textContent = s('Ready');
+  document.getElementById('stat-intransit').textContent = s('In Transit');
+  document.getElementById('stat-delivered').textContent = s('Delivered');
+  document.getElementById('stat-rto').textContent = s('RTO - In Transit');
+  document.getElementById('stat-cancelled').textContent = s('Cancelled');
+  document.getElementById('stat-paid').textContent = allOrders.filter(o=>o.PaymentStatus==='Paid').length;
+  document.getElementById('stat-unpaid').textContent = allOrders.filter(o=>o.PaymentStatus!=='Paid').length;
+
+  const recent = [...allOrders].sort((a,b)=>new Date(b.UpdatedAt)-new Date(a.UpdatedAt)).slice(0,10);
+  document.getElementById('recent-orders-body').innerHTML = recent.map(o=>`
+    <tr class="order-row" onclick="openOrder('${o.OrderID}')">
+      <td class="tbl-link">${o.OrderID}</td>
+      <td>${esc(o.CustomerName)}</td>
+      <td>${statusBadge(o.OrderStatus)}</td>
+      <td>${payBadge(o.PaymentStatus)}</td>
+      <td style="color:var(--muted);font-size:12px">${fmtDate(o.UpdatedAt)}</td>
+    </tr>`).join('') || `<tr><td colspan="5" class="table-empty">No orders yet</td></tr>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ALL ORDERS TABLE
+// ═══════════════════════════════════════════════════════════
+function renderOrdersTable() {
+  const q = document.getElementById('orders-search').value.toLowerCase();
+  const fS = activeStatusFilter;
+  const fP = document.getElementById('filter-payment').value;
+  const fD = document.getElementById('filter-delivery').value;
+
+  let filtered = allOrders.filter(o => {
+    if (fS && o.OrderStatus !== fS) return false;
+    if (fP && o.PaymentStatus !== fP) return false;
+    if (fD && o.DeliveryType !== fD) return false;
+    if (q) {
+      const h = `${o.OrderID} ${o.CustomerName} ${o.Phone} ${o.AWB||''} ${o.Pincode}`.toLowerCase();
+      if (!h.includes(q)) return false;
+    }
+    return true;
+  }).sort((a,b)=>new Date(b.UpdatedAt||b.CreatedAt)-new Date(a.UpdatedAt||a.CreatedAt));
+
+  document.getElementById('orders-table-body').innerHTML = filtered.map(o => {
+    const amt = orderAmount(o.OrderID);
+    const courierCell = buildCourierCell(o);
+    return `<tr class="order-row" onclick="openOrder('${o.OrderID}')">
+      <td class="tbl-link">${o.OrderID}</td>
+      <td>${esc(o.CustomerName)}</td>
+      <td style="font-family:monospace;font-size:12px">${o.Phone||''}</td>
+      <td class="amount-cell">${fmtAmount(amt)}</td>
+      <td>${payBadge(o.PaymentStatus)}</td>
+      <td>${statusBadge(o.OrderStatus)}</td>
+      <td class="courier-cell" onclick="event.stopPropagation()">${courierCell}</td>
+      <td style="color:var(--muted);font-size:12px">${fmtDate(o.UpdatedAt||o.CreatedAt)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="8" class="table-empty">No orders match your filters</td></tr>`;
+
+  document.getElementById('orders-count').textContent = `Showing ${filtered.length} of ${allOrders.length} orders`;
+}
+
+function buildCourierCell(o) {
+  if (o.DeliveryType !== 'Shipping') return '<span style="color:var(--muted)">—</span>';
+  const courier = esc(o.Courier||'—');
+  const awb = o.AWB ? o.AWB.trim() : '';
+  if (!awb) return `<span style="color:var(--muted)">${courier}</span>`;
+  const url = `https://www.delhivery.com/track-v2/package/${encodeURIComponent(awb)}`;
+  return `<div style="color:var(--muted);font-size:11px">${courier}</div><a class="awb-link" href="${url}" target="_blank" rel="noopener">${esc(awb)} ↗</a>`;
+}
+
+// Status tabs
+document.getElementById('status-tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  document.querySelectorAll('#status-tabs .tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  activeStatusFilter = tab.dataset.status;
+  renderOrdersTable();
+});
+
+// ═══════════════════════════════════════════════════════════
+// ORDER DETAIL
+// ═══════════════════════════════════════════════════════════
+function openOrder(id) {
+  currentOrder = allOrders.find(o => o.OrderID === id);
+  if (!currentOrder) return;
+  renderDetail();
+  navigate('detail');
+}
+
+function renderDetail() {
+  const o = currentOrder;
+  const items = allItems.filter(i => i.OrderID === o.OrderID);
+  const total = items.reduce((s,i)=>(s+(parseFloat(i.Price)||0)*(parseInt(i.Quantity)||1)),0);
+
+  document.getElementById('edit-btn').style.display='';
+  document.getElementById('save-btn').style.display='none';
+  document.getElementById('cancel-btn').style.display='none';
+
+  const shippingAWBLink = o.AWB
+    ? `<a class="awb-link" href="https://www.delhivery.com/track-v2/package/${encodeURIComponent(o.AWB)}" target="_blank" rel="noopener">${esc(o.AWB)} ↗ Track</a>`
+    : '—';
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="section">
+      <div class="section-title">${esc(o.OrderID)} — ${esc(o.CustomerName)}</div>
+      <div class="detail-grid" id="detail-fields">
+        ${df('Customer Name','CustomerName',o,'text')}
+        ${df('Phone','Phone',o,'tel')}
+        ${df('Email','Email',o,'email')}
+        ${df('Address','Address',o,'textarea')}
+        ${df('Landmark','Landmark',o,'text')}
+        ${df('Pincode','Pincode',o,'text')}
+        ${df('Delivery Type','DeliveryType',o,'select-delivery')}
+        <div class="detail-block">
+          <div class="detail-key">Courier / AWB</div>
+          <div class="detail-val" id="view-CourierAWB">${o.DeliveryType==='Shipping' ? `${esc(o.Courier||'—')} / ${shippingAWBLink}` : '—'}</div>
+          <input type="text" id="edit-Courier" value="${esc(o.Courier||'')}" placeholder="Courier" style="display:none;margin-bottom:6px">
+          <input type="text" id="edit-AWB" value="${esc(o.AWB||'')}" placeholder="AWB Number" style="display:none">
+        </div>
+        ${df('Payment Status','PaymentStatus',o,'select-payment')}
+        ${df('Order Status','OrderStatus',o,'select-status')}
+        <div class="detail-block"><div class="detail-key">Created</div><div class="detail-val">${fmtDate(o.CreatedAt)}</div></div>
+        <div class="detail-block"><div class="detail-key">Updated</div><div class="detail-val">${fmtDate(o.UpdatedAt)}</div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">
+        Products
+        <span style="font-size:14px;font-weight:700;color:var(--accent2)">${fmtAmount(total)}</span>
+      </div>
+      <div class="table-wrap product-table-mini" id="detail-products-view">
+        <table>
+          <thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead>
+          <tbody id="detail-products-body"></tbody>
+        </table>
+      </div>
+      <div id="edit-products-wrap" style="display:none">
+        <div class="products-header">
+          <span class="ph-name">Product Name</span><span class="ph-qty">Qty</span><span class="ph-price">Price (₹)</span><span class="ph-del"></span>
+        </div>
+        <div class="products-list" id="edit-products-list"></div>
+        <button type="button" class="btn btn-secondary btn-sm" id="add-prod-btn" onclick="addProductRow('edit')" style="display:none">+ Add Product</button>
+        <div class="order-total-row">Edit Total: <span class="order-total-val" id="edit-order-total">₹0</span></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Activity Log</div>
+      <div class="log-list" id="activity-log">
+        <div class="log-item"><div class="log-dot"></div><div><div class="log-text">Order created</div><div class="log-time">${fmtDate(o.CreatedAt)}</div></div></div>
+      </div>
+    </div>`;
+
+  renderDetailProducts(items);
+  loadActivityLog(o.OrderID);
+}
+
+function df(label, field, o, type) {
+  const val = o[field] || '';
+  let editEl = '';
+  if (type==='select-status') {
+    editEl = `<select id="edit-${field}" style="display:none">${STATUS_OPTIONS.map(s=>`<option${val===s?' selected':''}>${s}</option>`).join('')}</select>`;
+  } else if (type==='select-payment') {
+    editEl = `<select id="edit-${field}" style="display:none"><option${val==='Paid'?' selected':''}>Paid</option><option${val==='Not Paid'?' selected':''}>Not Paid</option></select>`;
+  } else if (type==='select-delivery') {
+    editEl = `<select id="edit-${field}" style="display:none"><option${val==='Handover'?' selected':''}>Handover</option><option${val==='Pickup'?' selected':''}>Pickup</option><option${val==='Shipping'?' selected':''}>Shipping</option></select>`;
+  } else if (type==='textarea') {
+    editEl = `<textarea id="edit-${field}" rows="2" style="display:none">${esc(val)}</textarea>`;
+  } else {
+    editEl = `<input type="${type}" id="edit-${field}" value="${esc(val)}" style="display:none">`;
+  }
+  return `<div class="detail-block">
+    <div class="detail-key">${label}</div>
+    <div class="detail-val" id="view-${field}">${val||'<span style="color:var(--muted)">—</span>'}</div>
+    ${editEl}
+  </div>`;
+}
+
+function renderDetailProducts(items) {
+  document.getElementById('detail-products-body').innerHTML = items.map(i => {
+    const sub = (parseFloat(i.Price)||0)*(parseInt(i.Quantity)||1);
+    return `<tr><td>${esc(i.ProductName)}</td><td>${i.Quantity}</td><td>${fmtAmount(parseFloat(i.Price)||0)}</td><td style="font-weight:600;color:var(--accent2)">${fmtAmount(sub)}</td></tr>`;
+  }).join('') || `<tr><td colspan="4" style="color:var(--muted);padding:12px">No products</td></tr>`;
+}
+
+async function loadActivityLog(orderId) {
+  try {
+    const res = await api('getLog', { orderId });
+    const logs = res.data || [];
+    if (!logs.length) return;
+    const el = document.getElementById('activity-log');
+    if (!el) return;
+    el.innerHTML = logs.map(l=>`<div class="log-item"><div class="log-dot"></div><div><div class="log-text">${esc(l.Description)}</div><div class="log-time">${fmtDate(l.Timestamp)}</div></div></div>`).join('');
+  } catch(e) {}
+}
+
+const EDIT_FIELDS = ['CustomerName','Phone','Email','Address','Landmark','Pincode','DeliveryType','PaymentStatus','OrderStatus'];
+
+function enterEditMode() {
+  EDIT_FIELDS.forEach(f => {
+    const v = document.getElementById(`view-${f}`);
+    const e = document.getElementById(`edit-${f}`);
+    if (v) v.style.display='none';
+    if (e) e.style.display='';
+  });
+  // Courier/AWB
+  const vCA = document.getElementById('view-CourierAWB');
+  if (vCA) vCA.style.display='none';
+  const eC = document.getElementById('edit-Courier');
+  const eA = document.getElementById('edit-AWB');
+  if (eC) eC.style.display='';
+  if (eA) eA.style.display='';
+
+  document.getElementById('edit-btn').style.display='none';
+  document.getElementById('save-btn').style.display='';
+  document.getElementById('cancel-btn').style.display='';
+
+  // Switch to edit product list
+  document.getElementById('detail-products-view').style.display='none';
+  document.getElementById('edit-products-wrap').style.display='';
+  document.getElementById('add-prod-btn').style.display='';
+  const items = allItems.filter(i => i.OrderID === currentOrder.OrderID);
+  const list = document.getElementById('edit-products-list');
+  list.innerHTML = '';
+  items.forEach(item => addProductRow('edit', item.ProductName, item.Quantity, item.Price));
+  recalcEditTotal();
+}
+
+function cancelEdit() { renderDetail(); }
+
+async function saveOrder() {
+  const btn = document.getElementById('save-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+
+  const updated = {};
+  EDIT_FIELDS.forEach(f => {
+    const el = document.getElementById(`edit-${f}`);
+    if (el) updated[f] = el.value;
+  });
+  const eC = document.getElementById('edit-Courier');
+  const eA = document.getElementById('edit-AWB');
+  if (eC) updated.Courier = eC.value;
+  if (eA) updated.AWB = eA.value;
+
+  const rows = document.querySelectorAll('#edit-products-list .product-row');
+  const products = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.prod-name')?.value?.trim();
+    const qty  = parseInt(row.querySelector('.prod-qty')?.value)||1;
+    const price = parseFloat(row.querySelector('.prod-price')?.value)||0;
+    if (name) products.push({ ProductName: name, Quantity: qty, Price: price });
+  });
+
+  try {
+    await apiPost('updateOrder', { orderId: currentOrder.OrderID, fields: updated, products });
+  } catch(e) {}
+
+  const idx = allOrders.findIndex(o=>o.OrderID===currentOrder.OrderID);
+  if (idx>=0) allOrders[idx] = { ...allOrders[idx], ...updated, UpdatedAt: new Date().toISOString() };
+  allItems = allItems.filter(i=>i.OrderID!==currentOrder.OrderID);
+  products.forEach(p=>allItems.push({ OrderID: currentOrder.OrderID, ...p }));
+  currentOrder = allOrders[idx];
+  renderDetail(); renderOverview(); renderOrdersTable();
+  toast('Order updated', 'success');
+  btn.disabled=false; btn.textContent='✓ Save Changes';
+}
+
+function copyAddress() {
+  if (!currentOrder) return;
+  const o = currentOrder;
+  const parts = [o.CustomerName, o.Address, o.Landmark, o.Pincode].filter(Boolean);
+  navigator.clipboard.writeText(parts.join(', ')).then(()=>toast('Address copied!','success'));
+}
+function copyPhone() {
+  if (!currentOrder) return;
+  navigator.clipboard.writeText(currentOrder.Phone).then(()=>toast('Phone copied!','success'));
+}
+function openWhatsapp() {
+  if (!currentOrder) return;
+  const phone = currentOrder.Phone.replace(/\D/g,'');
+  window.open(`https://wa.me/${phone.startsWith('91')?phone:'91'+phone}`, '_blank');
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEW ORDER
+// ═══════════════════════════════════════════════════════════
+async function initNewOrderPage() {
+  generateNextID();
+  if (document.querySelectorAll('#no-products-list .product-row').length === 0) {
+    addProductRow('no');
+  }
+  // Attach keydown guards to phone/pincode on page init
+  const ph = document.getElementById('no-phone');
+  const pc = document.getElementById('no-pincode');
+  if (ph && !ph._guardAttached) { ph.addEventListener('keydown', numericKeydown); ph._guardAttached=true; }
+  if (pc && !pc._guardAttached) { pc.addEventListener('keydown', numericKeydown); pc._guardAttached=true; }
+}
+
+function generateNextID() {
+  const idField = document.getElementById('no-id');
+  if (!allOrders.length) { idField.value='AUR-0001'; document.getElementById('order-id-hint').textContent='First order'; return; }
+  const nums = allOrders.map(o=>{ const m=o.OrderID.match(/(\d+)$/); return m?parseInt(m[1]):0; });
+  const lastNum = Math.max(...nums);
+  const lastOrder = allOrders.find(o=>o.OrderID.endsWith(String(lastNum).padStart(4,'0'))) || allOrders[allOrders.length-1];
+  idField.value = `AUR-${String(lastNum+1).padStart(4,'0')}`;
+  document.getElementById('order-id-hint').textContent = `Last created: ${lastOrder.OrderID}`;
+}
+
+function toggleShippingFields(prefix) {
+  const val = document.getElementById(`${prefix}-delivery`).value;
+  const show = val === 'Shipping';
+  document.getElementById(`${prefix}-courier-group`).style.display = show?'':'none';
+  document.getElementById(`${prefix}-awb-group`).style.display = show?'':'none';
+}
+
+async function submitNewOrder(e) {
+  e.preventDefault();
+  const btn = document.getElementById('new-order-submit');
+
+  // Validate phone length
+  const phone = document.getElementById('no-phone').value;
+  if (phone.length !== 10) { toast('Phone number must be exactly 10 digits', 'error'); document.getElementById('no-phone').classList.add('invalid'); return; }
+  document.getElementById('no-phone').classList.remove('invalid');
+
+  // Validate pincode length
+  const pincode = document.getElementById('no-pincode').value;
+  if (pincode.length !== 6) { toast('Pincode must be exactly 6 digits', 'error'); document.getElementById('no-pincode').classList.add('invalid'); return; }
+  document.getElementById('no-pincode').classList.remove('invalid');
+
+  // Validate shipping fields
+  const delivery = document.getElementById('no-delivery').value;
+  if (delivery === 'Shipping') {
+    if (!document.getElementById('no-courier').value.trim()) { toast('Courier is required for shipping orders', 'error'); return; }
+    if (!document.getElementById('no-awb').value.trim()) { toast('AWB Number is required for shipping orders', 'error'); return; }
+  }
+
+  // Collect products
+  const rows = document.querySelectorAll('#no-products-list .product-row');
+  const products = [];
+  let productError = false;
+  rows.forEach(row => {
+    const name  = row.querySelector('.prod-name')?.value?.trim();
+    const qty   = parseInt(row.querySelector('.prod-qty')?.value)||0;
+    const price = parseFloat(row.querySelector('.prod-price')?.value);
+    if (!name || !qty || isNaN(price) || price < 0) { productError = true; }
+    else products.push({ ProductName: name, Quantity: qty, Price: price });
+  });
+
+  if (productError || !products.length) { toast('Each product needs a name, quantity, and price', 'error'); return; }
+
+  const orderId = document.getElementById('no-id').value.trim();
+  if (allOrders.find(o=>o.OrderID===orderId)) { toast('Order ID already exists', 'error'); return; }
+
+  btn.disabled=true; btn.textContent='Creating…';
+
+  const order = {
+    OrderID: orderId,
+    CustomerName: document.getElementById('no-name').value.trim(),
+    Email: document.getElementById('no-email').value.trim(),
+    Phone: phone, Address: document.getElementById('no-address').value.trim(),
+    Landmark: document.getElementById('no-landmark').value.trim(),
+    Pincode: pincode, DeliveryType: delivery,
+    Courier: document.getElementById('no-courier').value.trim(),
+    AWB: document.getElementById('no-awb').value.trim(),
+    PaymentStatus: document.getElementById('no-payment').value,
+    OrderStatus: document.getElementById('no-status').value,
+    CreatedAt: new Date().toISOString(), UpdatedAt: new Date().toISOString(),
+  };
+
+  try {
+    await apiPost('createOrder', { order, products });
+  } catch(e) {}
+
+  allOrders.push(order);
+  products.forEach(p=>allItems.push({ OrderID: order.OrderID, ...p }));
+  productNames = [...new Set([...productNames, ...products.map(p=>p.ProductName)])];
+  renderOverview(); renderOrdersTable(); renderDeleteList();
+  toast('Order created: ' + order.OrderID, 'success');
+  resetNewOrderForm();
+  navigate('orders');
+  btn.disabled=false; btn.textContent='Create Order';
+}
+
+function resetNewOrderForm() {
+  document.getElementById('new-order-form').reset();
+  document.getElementById('no-products-list').innerHTML='';
+  addProductRow('no');
+  generateNextID();
+  toggleShippingFields('no');
+  document.getElementById('no-order-total').textContent='₹0';
+  document.getElementById('no-phone').classList.remove('invalid');
+  document.getElementById('no-pincode').classList.remove('invalid');
+}
+
+// ═══════════════════════════════════════════════════════════
+// PRODUCT ROWS (shared for new / edit)
+// ═══════════════════════════════════════════════════════════
+function addProductRow(prefix, name='', qty=1, price='') {
+  const container = prefix==='edit'
+    ? document.getElementById('edit-products-list')
+    : document.getElementById('no-products-list');
+  if (!container) return;
+
+  const row = document.createElement('div');
+  row.className = 'product-row';
+  row.innerHTML = `
+    <div class="product-autocomplete" style="flex:4;min-width:0">
+      <input type="text" class="prod-name" placeholder="Product name" value="${esc(name)}" autocomplete="off" oninput="filterAutocomplete(this)" required>
+      <div class="autocomplete-dropdown"></div>
+    </div>
+    <div class="prod-qty-wrap">
+      <input type="number" class="prod-qty" placeholder="Qty" value="${qty}" min="1" oninput="recalcTotal()" required>
+    </div>
+    <div class="prod-price-wrap">
+      <span class="rupee-symbol">₹</span>
+      <input type="number" class="prod-price" placeholder="0" value="${price}" min="0" step="0.01" oninput="recalcTotal()" required>
+    </div>
+    <button type="button" class="btn-icon" onclick="this.parentElement.remove();recalcTotal()">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>`;
+  container.appendChild(row);
+  recalcTotal();
+}
+
+function recalcTotal() {
+  // New order page total
+  const noList = document.getElementById('no-products-list');
+  if (noList) {
+    let t = 0;
+    noList.querySelectorAll('.product-row').forEach(row => {
+      const qty   = parseFloat(row.querySelector('.prod-qty')?.value)||0;
+      const price = parseFloat(row.querySelector('.prod-price')?.value)||0;
+      t += qty * price;
+    });
+    const el = document.getElementById('no-order-total');
+    if (el) el.textContent = fmtAmount(t);
+  }
+  recalcEditTotal();
+}
+
+function recalcEditTotal() {
+  const editList = document.getElementById('edit-products-list');
+  if (!editList) return;
+  let t = 0;
+  editList.querySelectorAll('.product-row').forEach(row => {
+    const qty   = parseFloat(row.querySelector('.prod-qty')?.value)||0;
+    const price = parseFloat(row.querySelector('.prod-price')?.value)||0;
+    t += qty * price;
+  });
+  const el = document.getElementById('edit-order-total');
+  if (el) el.textContent = fmtAmount(t);
+}
+
+function filterAutocomplete(input) {
+  const q = input.value.toLowerCase();
+  const dropdown = input.nextElementSibling;
+  if (!q) { dropdown.classList.remove('open'); return; }
+  const matches = productNames.filter(n=>n.toLowerCase().includes(q));
+  if (!matches.length) { dropdown.classList.remove('open'); return; }
+  dropdown.innerHTML = matches.slice(0,8).map(n=>`<div class="autocomplete-item" onmousedown="selectAutoComplete(event,'${esc(n)}')">${esc(n)}</div>`).join('');
+  dropdown.classList.add('open');
+  input.onblur = () => setTimeout(()=>dropdown.classList.remove('open'), 150);
+}
+
+function selectAutoComplete(e, name) {
+  e.preventDefault();
+  const input = e.target.closest('.product-autocomplete').querySelector('.prod-name');
+  input.value = name;
+  input.nextElementSibling.classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════
+// DELETE ORDERS
+// ═══════════════════════════════════════════════════════════
+function renderDeleteList() {
+  const q = (document.getElementById('delete-search')?.value||'').toLowerCase();
+  let orders = allOrders.filter(o => {
+    if (!q) return true;
+    return `${o.OrderID} ${o.CustomerName} ${o.Phone}`.toLowerCase().includes(q);
+  }).sort((a,b)=>new Date(b.UpdatedAt||b.CreatedAt)-new Date(a.UpdatedAt||a.CreatedAt));
+
+  const list = document.getElementById('delete-list');
+  if (!list) return;
+  list.innerHTML = orders.map(o => {
+    const items = allItems.filter(i=>i.OrderID===o.OrderID);
+    const amt = orderAmount(o.OrderID);
+    return `<div class="delete-item">
+      <div class="delete-item-info">
+        <div class="delete-item-id">${o.OrderID}</div>
+        <div class="delete-item-name">${esc(o.CustomerName)}</div>
+        <div class="delete-item-meta">${statusBadge(o.OrderStatus)} ${payBadge(o.PaymentStatus)} · ${items.length} product(s) · ${fmtAmount(amt)}</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="showDeleteModal('${o.OrderID}')">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+        Delete
+      </button>
+    </div>`;
+  }).join('') || `<div style="text-align:center;padding:48px;color:var(--muted)">No orders found</div>`;
+}
+
+function showDeleteModal(orderId) {
+  orderToDelete = orderId;
+  const o = allOrders.find(x=>x.OrderID===orderId);
+  if (!o) return;
+  const items = allItems.filter(i=>i.OrderID===orderId);
+  document.getElementById('delete-modal-info').innerHTML = `
+    <strong>${o.OrderID}</strong> — ${esc(o.CustomerName)}<br>
+    ${statusBadge(o.OrderStatus)} ${payBadge(o.PaymentStatus)}<br>
+    <span style="color:var(--muted)">${items.length} product(s) · ${fmtAmount(orderAmount(orderId))}</span>`;
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+function closeDeleteModal() {
+  document.getElementById('delete-modal').classList.remove('open');
+  orderToDelete = null;
+}
+
+async function confirmDelete() {
+  if (!orderToDelete) return;
+  const btn = document.getElementById('delete-confirm-btn');
+  btn.disabled=true; btn.textContent='Deleting…';
+
+  try {
+    await apiPost('deleteOrder', { orderId: orderToDelete });
+  } catch(e) {}
+
+  allOrders = allOrders.filter(o=>o.OrderID!==orderToDelete);
+  allItems  = allItems.filter(i=>i.OrderID!==orderToDelete);
+  closeDeleteModal();
+  renderDeleteList(); renderOverview(); renderOrdersTable();
+  toast('Order deleted', 'success');
+  btn.disabled=false; btn.textContent='Delete Permanently';
+}
+
+// ═══════════════════════════════════════════════════════════
+// BULK CREATE
+// ═══════════════════════════════════════════════════════════
+const BC_HEADERS = ['Order ID','Customer Name','Phone Number','Address','Landmark','Pincode','Delivery Type','Payment Status','Order Status','Product Name','Quantity','Price'];
+
+function handleCSVDrop(e, prefix) {
+  e.preventDefault();
+  document.getElementById(`${prefix}-zone`).classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) parseCSVFile(file, prefix);
+}
+function handleCSVFile(e, prefix) {
+  const file = e.target.files[0];
+  if (file) parseCSVFile(file, prefix);
+}
+function parseCSVFile(file, prefix) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    if (prefix==='bc') parseBulkCreate(ev.target.result);
+    else parseBulkEdit(ev.target.result);
+  };
+  reader.readAsText(file);
+}
+
+function parseBulkCreate(text) {
+  const rows = parseCSV(text);
+  const grouped = {};
+  rows.forEach(r => {
+    const id = r['Order ID']?.trim();
+    if (!id) return;
+    if (!grouped[id]) grouped[id] = {
+      OrderID:id, CustomerName:r['Customer Name'], Phone:r['Phone Number'],
+      Address:r['Address'], Landmark:r['Landmark'], Pincode:r['Pincode'],
+      DeliveryType:r['Delivery Type'], PaymentStatus:r['Payment Status'],
+      OrderStatus:r['Order Status'], products:[]
+    };
+    if (r['Product Name']) grouped[id].products.push({ ProductName:r['Product Name'], Quantity:parseInt(r['Quantity'])||1, Price:parseFloat(r['Price'])||0 });
+  });
+  const newOrders=[], skipped=[];
+  Object.values(grouped).forEach(o => {
+    if (allOrders.find(x=>x.OrderID===o.OrderID)) skipped.push(o.OrderID);
+    else newOrders.push(o);
+  });
+  pendingBcData = { newOrders, skipped };
+  renderBulkCreatePreview(newOrders, skipped);
+}
+
+function renderBulkCreatePreview(newOrders, skipped) {
+  document.getElementById('bc-preview-section').style.display='';
+  document.getElementById('bc-stats').innerHTML = `<span class="stat-chip stat-new">✓ ${newOrders.length} new</span><span class="stat-chip stat-skip">⊘ ${skipped.length} skipped (exist)</span>`;
+  document.getElementById('bc-preview-table').innerHTML = `<table><thead><tr><th>Order ID</th><th>Customer</th><th>Products</th><th>Amount</th><th>Status</th></tr></thead><tbody>
+    ${newOrders.map(o=>{
+      const amt = o.products.reduce((s,p)=>(s+(p.Price||0)*(p.Quantity||1)),0);
+      return `<tr><td style="font-family:monospace;font-size:12px;color:var(--accent2)">${o.OrderID}</td><td>${esc(o.CustomerName)}</td><td style="font-size:12px">${o.products.map(p=>`${p.ProductName} ×${p.Quantity}`).join(', ')}</td><td class="amount-cell">${fmtAmount(amt)}</td><td>${statusBadge(o.OrderStatus)}</td></tr>`;
+    }).join('')}
+    ${skipped.map(id=>`<tr style="opacity:.4"><td style="font-family:monospace;font-size:12px">${id}</td><td colspan="4" style="color:var(--yellow)">Skipped — already exists</td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function applyBulkCreate() {
+  if (!pendingBcData?.newOrders.length) { toast('Nothing to create','error'); return; }
+  const btn = event.target; btn.disabled=true; btn.textContent='Creating…';
+  for (const o of pendingBcData.newOrders) {
+    const order = { ...o, Email:'', CreatedAt:new Date().toISOString(), UpdatedAt:new Date().toISOString() };
+    try { await apiPost('createOrder', { order, products:o.products }); } catch(e) {}
+    allOrders.push(order);
+    o.products.forEach(p=>allItems.push({ OrderID:o.OrderID, ...p }));
+  }
+  renderOverview(); renderOrdersTable(); renderDeleteList();
+  toast(`Created ${pendingBcData.newOrders.length} orders`, 'success');
+  clearCSV('bc');
+  btn.disabled=false; btn.textContent='✓ Apply & Create Orders';
+}
+
+function downloadBulkCreateTemplate() {
+  const csv = BC_HEADERS.join(',') + '\n' +
+    'AUR-0010,Customer Name,9876543210,House No Street,Landmark,560001,Shipping,Not Paid,Confirmed,Chunky Bag,1,850\n' +
+    'AUR-0010,Customer Name,9876543210,House No Street,Landmark,560001,Shipping,Not Paid,Confirmed,Hair Clip,2,120\n';
+  downloadCSV(csv, 'aurella-bulk-create-template.csv');
+}
+
+// ═══════════════════════════════════════════════════════════
+// BULK EDIT
+// ═══════════════════════════════════════════════════════════
+function parseBulkEdit(text) {
+  const rows = parseCSV(text);
+  const updated=[], notFound=[], noChange=[];
+  rows.forEach(r => {
+    const id = r['Order ID']?.trim();
+    if (!id) return;
+    const existing = allOrders.find(o=>o.OrderID===id);
+    if (!existing) { notFound.push(id); return; }
+    const changes={};
+    if (r['Customer Name']?.trim()) changes.CustomerName=r['Customer Name'].trim();
+    if (r['Phone Number']?.trim()) changes.Phone=r['Phone Number'].trim();
+    if (r['Address']?.trim()) changes.Address=r['Address'].trim();
+    if (r['Landmark']?.trim()) changes.Landmark=r['Landmark'].trim();
+    if (r['Pincode']?.trim()) changes.Pincode=r['Pincode'].trim();
+    if (r['Delivery Type']?.trim()) changes.DeliveryType=r['Delivery Type'].trim();
+    if (r['Courier']?.trim()) changes.Courier=r['Courier'].trim();
+    if (r['AWB Number']?.trim()) changes.AWB=r['AWB Number'].trim();
+    if (r['Payment Status']?.trim()) changes.PaymentStatus=r['Payment Status'].trim();
+    if (r['Order Status']?.trim()) changes.OrderStatus=r['Order Status'].trim();
+    if (!Object.keys(changes).length) { noChange.push(id); return; }
+    updated.push({ id, existing, changes });
+  });
+  pendingBeData = { updated, notFound, noChange };
+  renderBulkEditPreview(updated, notFound, noChange);
+}
+
+function renderBulkEditPreview(updated, notFound, noChange) {
+  document.getElementById('be-preview-section').style.display='';
+  document.getElementById('be-stats').innerHTML = `<span class="stat-chip stat-update">↑ ${updated.length} to update</span><span class="stat-chip stat-notfound">✕ ${notFound.length} not found</span><span class="stat-chip stat-skip">— ${noChange.length} no changes</span>`;
+  document.getElementById('be-preview-table').innerHTML = `<table><thead><tr><th>Order ID</th><th>Fields Changing</th><th>Result</th></tr></thead><tbody>
+    ${updated.map(u=>`<tr><td style="font-family:monospace;font-size:12px;color:var(--accent2)">${u.id}</td><td style="font-size:12px">${Object.entries(u.changes).map(([k,v])=>`<strong>${k}</strong> → ${esc(v)}`).join(', ')}</td><td><span class="badge badge-intransit">will update</span></td></tr>`).join('')}
+    ${notFound.map(id=>`<tr><td style="font-family:monospace;font-size:12px">${id}</td><td colspan="2" style="color:var(--red);font-size:12px">Not found</td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function applyBulkEdit() {
+  if (!pendingBeData?.updated.length) { toast('Nothing to update','error'); return; }
+  const btn = event.target; btn.disabled=true; btn.textContent='Updating…';
+  for (const {id, changes} of pendingBeData.updated) {
+    try { await apiPost('updateOrder', { orderId:id, fields:changes }); } catch(e) {}
+    const idx = allOrders.findIndex(o=>o.OrderID===id);
+    if (idx>=0) allOrders[idx] = { ...allOrders[idx], ...changes, UpdatedAt:new Date().toISOString() };
+  }
+  renderOverview(); renderOrdersTable();
+  toast(`Updated ${pendingBeData.updated.length} orders`, 'success');
+  clearCSV('be');
+  btn.disabled=false; btn.textContent='✓ Apply Updates';
+}
+
+function downloadBulkEditTemplate() {
+  const csv = 'Order ID,Customer Name,Phone Number,Address,Landmark,Pincode,Delivery Type,Courier,AWB Number,Payment Status,Order Status\n' +
+    'AUR-0001,,,,,,,,,Paid,\n' +
+    'AUR-0002,,,,,,,Delhivery,DEL123456,,In Transit\n';
+  downloadCSV(csv, 'aurella-bulk-edit-template.csv');
+}
+
+function clearCSV(prefix) {
+  document.getElementById(`${prefix}-preview-section`).style.display='none';
+  document.getElementById(`${prefix}-file`).value='';
+  if (prefix==='bc') pendingBcData=null;
+  else pendingBeData=null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CSV HELPERS
+// ═══════════════════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (!lines.length) return [];
+  const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+  return lines.slice(1).filter(l=>l.trim()).map(line=>{
+    const vals = splitCSVLine(line);
+    const obj={};
+    headers.forEach((h,i)=>obj[h]=(vals[i]||'').trim().replace(/^"|"$/g,''));
+    return obj;
+  });
+}
+function splitCSVLine(line) {
+  const result=[]; let cur=''; let inQ=false;
+  for (let c of line) {
+    if (c==='"') { inQ=!inQ; }
+    else if (c===','&&!inQ) { result.push(cur); cur=''; }
+    else { cur+=c; }
+  }
+  result.push(cur); return result;
+}
+function exportCSV() {
+  const q = document.getElementById('orders-search').value.toLowerCase();
+  const fS=activeStatusFilter, fP=document.getElementById('filter-payment').value, fD=document.getElementById('filter-delivery').value;
+  let filtered = allOrders.filter(o=>{
+    if (fS&&o.OrderStatus!==fS) return false;
+    if (fP&&o.PaymentStatus!==fP) return false;
+    if (fD&&o.DeliveryType!==fD) return false;
+    if (q){const h=`${o.OrderID} ${o.CustomerName} ${o.Phone} ${o.AWB||''} ${o.Pincode}`.toLowerCase();if(!h.includes(q))return false;}
+    return true;
+  });
+  const headers=['OrderID','CustomerName','Email','Phone','Address','Landmark','Pincode','DeliveryType','Courier','AWB','PaymentStatus','OrderStatus','Amount','CreatedAt','UpdatedAt'];
+  const csv=[headers.join(','), ...filtered.map(o=>{
+    const row={...o, Amount:orderAmount(o.OrderID)};
+    return headers.map(h=>`"${String(row[h]||'').replace(/"/g,'""')}"`).join(',');
+  })].join('\n');
+  downloadCSV(csv, `aurella-orders-${new Date().toISOString().slice(0,10)}.csv`);
+}
+function downloadCSV(content, filename) {
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type:'text/csv'}));
+  a.download=filename; a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+function showConfig() { document.getElementById('config-url').value=API_URL; document.getElementById('config-modal').classList.add('open'); }
+function closeConfig() { document.getElementById('config-modal').classList.remove('open'); }
+async function saveConfig() {
+  const url = document.getElementById('config-url').value.trim();
+  if (!url) { toast('Enter a URL','error'); return; }
+  API_URL=url; localStorage.setItem('aurella_api',url);
+  closeConfig(); await loadData();
+}
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById(`page-${page}`)?.classList.add('active');
+  document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+  if (page==='neworder') initNewOrderPage();
+  if (page==='deleteorders') renderDeleteList();
+  window.scrollTo(0,0); closeSidebar();
+}
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click', ()=>navigate(item.dataset.page));
+});
+function filterAndGo(status, payment='') {
+  navigate('orders');
+  document.getElementById('orders-search').value='';
+  document.getElementById('filter-payment').value=payment;
+  document.getElementById('filter-delivery').value='';
+  document.querySelectorAll('#status-tabs .tab').forEach(t=>t.classList.toggle('active',t.dataset.status===status));
+  activeStatusFilter=status; renderOrdersTable();
+}
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
+document.addEventListener('click', e=>{
+  if (!e.target.closest('#sidebar')&&!e.target.closest('#mobile-header')) closeSidebar();
+});
+
+// ═══════════════════════════════════════════════════════════
+// BADGES & FORMATTING
+// ═══════════════════════════════════════════════════════════
+const STATUS_OPTIONS=['Confirmed','In Progress','Ready','In Transit','Delivered','RTO - In Transit','Cancelled'];
+function statusBadge(s) {
+  const m={'Confirmed':'badge-confirmed','In Progress':'badge-inprogress','Ready':'badge-ready','In Transit':'badge-intransit','Delivered':'badge-delivered','RTO - In Transit':'badge-rto','Cancelled':'badge-cancelled'};
+  return `<span class="badge ${m[s]||''}">${s||'—'}</span>`;
+}
+function payBadge(s) { return s==='Paid'?`<span class="badge badge-paid">Paid</span>`:`<span class="badge badge-unpaid">Not Paid</span>`; }
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ═══════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════
+function toast(msg, type='info') {
+  const el=document.createElement('div');
+  el.className=`toast ${type}`; el.textContent=msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(()=>el.remove(), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', ()=>{
+  loadData();
+  if (!API_URL) setTimeout(()=>toast('No API configured — running in demo mode. Click ⚙ Configure API to connect.','info'), 800);
+});
+</script>
+</body>
+</html>
