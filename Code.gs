@@ -69,12 +69,12 @@ function getSheet(name) {
 
 function initSheet(sheet, name) {
   if (name === ORDERS_SHEET) {
-    sheet.appendRow(['OrderID','CustomerName','Phone','Address','Landmark','Pincode',
+    sheet.appendRow(['OrderID','CustomerName','Phone','Address','Landmark','City','Pincode',
                      'DeliveryType','Courier','AWB','PaymentStatus','OrderStatus',
                      'CreatedAt','UpdatedAt']);
   }
   if (name === ITEMS_SHEET) {
-    sheet.appendRow(['OrderID','ProductName','Quantity']);
+    sheet.appendRow(['OrderID','ProductName','Quantity','Price']);
   }
   if (name === LOG_SHEET) {
     sheet.appendRow(['OrderID','Description','Timestamp']);
@@ -109,13 +109,13 @@ function createOrder(body) {
 
   sheet.appendRow([
     order.OrderID, order.CustomerName, order.Phone, order.Address,
-    order.Landmark, order.Pincode, order.DeliveryType, order.Courier||'',
+    order.Landmark||'', order.City||'', order.Pincode, order.DeliveryType, order.Courier||'',
     order.AWB||'', order.PaymentStatus, order.OrderStatus, now, now
   ]);
 
   const itemSheet = getSheet(ITEMS_SHEET);
   (products||[]).forEach(p => {
-    itemSheet.appendRow([order.OrderID, p.ProductName, p.Quantity]);
+    itemSheet.appendRow([order.OrderID, p.ProductName, p.Quantity, p.Price||0]);
   });
 
   addLog(order.OrderID, `Order created — ${order.OrderStatus} / ${order.PaymentStatus}`);
@@ -132,8 +132,8 @@ function updateOrder(body) {
   if (rowNum < 0) return { error: 'Order not found: ' + orderId };
 
   const fieldMap = {
-    CustomerName:1, Phone:2, Address:3, Landmark:4, Pincode:5,
-    DeliveryType:6, Courier:7, AWB:8, PaymentStatus:9, OrderStatus:10
+    CustomerName:1, Phone:2, Address:3, Landmark:4, City:5, Pincode:6,
+    DeliveryType:7, Courier:8, AWB:9, PaymentStatus:10, OrderStatus:11
   };
   // Headers are 0-indexed; columns start at 1. Adjust per actual sheet columns.
   const headerIdx = {};
@@ -159,7 +159,7 @@ function updateOrder(body) {
     for (let i = itemData.length - 1; i >= 1; i--) {
       if (String(itemData[i][0]) === orderId) itemSheet.deleteRow(i+1);
     }
-    products.forEach(p => itemSheet.appendRow([orderId, p.ProductName, p.Quantity]));
+    products.forEach(p => itemSheet.appendRow([orderId, p.ProductName, p.Quantity, p.Price||0]));
   }
 
   if (changes.length) addLog(orderId, `Updated: ${changes.join(', ')}`);
