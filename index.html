@@ -713,7 +713,7 @@ async function apiPost(action, payload = {}) {
   if (!API_URL) throw new Error('API not configured');
   const res = await fetch(API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action, ...payload })
   });
   const json = await res.json();

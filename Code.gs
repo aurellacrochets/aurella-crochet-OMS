@@ -3,7 +3,7 @@
 // Deploy as: Web App → Execute as: Me → Who has access: Anyone
 // ═══════════════════════════════════════════════════════════════════
 
-const SHEET_ID = ''; // ← PASTE YOUR GOOGLE SHEET ID HERE
+const SHEET_ID = '1Y_V9OawA9lys0Pw5XR0i5QcZGsU1T9BPkwsbGgGLehY';
 const ORDERS_SHEET   = 'Orders';
 const ITEMS_SHEET    = 'OrderItems';
 const LOG_SHEET      = 'ActivityLog';
@@ -13,6 +13,12 @@ function corsOutput(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── CORS preflight ───────────────────────────────────────────────────
+function doOptions(e) {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
 }
 
 // ── GET router ───────────────────────────────────────────────────────
