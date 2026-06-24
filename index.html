@@ -264,11 +264,108 @@ h3 { font-size: 16px; font-weight: 600; }
 .tbl-link { color: var(--accent2); cursor: pointer; font-family: monospace; font-size: 12px; }
 .tbl-link:hover { text-decoration: underline; }
 .amount-cell { font-size: 13px; font-weight: 600; color: var(--accent2); font-family: monospace; }
+
+/* ─── LOGIN SCREEN ────────────────────────────────────────── */
+#login-screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 9000;
+  align-items: center;
+  justify-content: center;
+}
+#login-screen.visible { display: flex; }
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 40px 36px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.5);
+}
+.login-brand {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent2);
+  letter-spacing: -.3px;
+  margin-bottom: 4px;
+}
+.login-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 28px;
+}
+.login-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.login-field label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.login-field input { font-size: 15px; padding: 10px 14px; }
+.login-btn {
+  width: 100%;
+  padding: 11px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity .15s;
+}
+.login-btn:hover { opacity: .85; }
+.login-btn:disabled { opacity: .5; cursor: not-allowed; }
+.login-error {
+  display: none;
+  background: #2a1010;
+  border: 1px solid #7f2020;
+  color: var(--red);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.login-error.visible { display: block; }
+
+/* ─── LOGOUT BUTTON ──────────────────────────────────────── */
+.logout-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.logout-btn:hover { color: var(--red); border-color: #7f2020; }
 </style>
 </head>
 <body>
 
-<!-- SIDEBAR -->
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="visible">
+  <div class="login-card">
+    <div class="login-brand">✦ Aurella</div>
+    <div class="login-sub">Sign in to Order Management</div>
+    <div class="login-field">
+      <label for="login-username">Username</label>
+      <input type="text" id="login-username" placeholder="Enter username" autocomplete="username" autocapitalize="none">
+    </div>
+    <div class="login-field">
+      <label for="login-password">Password</label>
+      <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+    <p style="font-size:11px;color:var(--muted);margin-top:16px;line-height:1.6">
+      No API configured yet? <span style="color:var(--accent2);cursor:pointer" onclick="skipLogin()">Continue in demo mode →</span>
+    </p>
+  </div>
+</div>
+
 <aside id="sidebar">
   <div class="sidebar-logo">
     <div class="brand">✦ Aurella</div>
@@ -308,6 +405,7 @@ h3 { font-size: 16px; font-weight: 600; }
     <div style="margin-top:10px;">
       <button class="btn btn-secondary btn-sm" onclick="showConfig()" style="width:100%">⚙ Configure API</button>
     </div>
+    <button class="logout-btn" id="logout-btn" onclick="doLogout()" style="display:none">⎋ Sign Out</button>
   </div>
 </aside>
 
@@ -693,6 +791,8 @@ function numericKeydown(e) {
 // STATE
 // ═══════════════════════════════════════════════════════════
 let API_URL = localStorage.getItem('aurella_api') || '';
+let AUTH_TOKEN = localStorage.getItem('aurella_token') || '';
+let AUTH_USER = localStorage.getItem('aurella_user') || '';
 let allOrders = [];
 let allItems  = [];
 let currentOrder = null;
@@ -703,13 +803,105 @@ let productNames  = [];
 let orderToDelete = null;
 
 // ═══════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+
+  if (!API_URL) { toast('Configure your API URL first — use "Continue in demo mode" below', 'error'); return; }
+  if (!username || !password) { showLoginError('Please enter username and password'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  err.classList.remove('visible');
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'login', username, password })
+    });
+    const json = await res.json();
+    if (json.error) { showLoginError(json.error); return; }
+
+    AUTH_TOKEN = json.token;
+    AUTH_USER  = json.username;
+    localStorage.setItem('aurella_token', AUTH_TOKEN);
+    localStorage.setItem('aurella_user', AUTH_USER);
+    hideLoginScreen();
+    loadData();
+  } catch(e) {
+    showLoginError('Could not reach server. Check your API URL in demo mode → Configure API.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+}
+
+async function doLogout() {
+  if (API_URL && AUTH_TOKEN) {
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'logout', token: AUTH_TOKEN })
+      });
+    } catch(e) {}
+  }
+  AUTH_TOKEN = '';
+  AUTH_USER  = '';
+  localStorage.removeItem('aurella_token');
+  localStorage.removeItem('aurella_user');
+  showLoginScreen();
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.add('visible');
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('login-password').value = '';
+}
+
+function hideLoginScreen() {
+  document.getElementById('login-screen').classList.remove('visible');
+  document.getElementById('logout-btn').style.display = '';
+  if (AUTH_USER) document.getElementById('logout-btn').textContent = `⎋ Sign Out (${AUTH_USER})`;
+}
+
+function skipLogin() {
+  // Demo mode — no token, no API
+  AUTH_TOKEN = '';
+  AUTH_USER  = '';
+  hideLoginScreen();
+  document.getElementById('logout-btn').style.display = 'none';
+  loadDemoData();
+}
+
+// Enter key on password field triggers login
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('login-username').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-password').focus();
+});
+
+// ═══════════════════════════════════════════════════════════
 // API
 // ═══════════════════════════════════════════════════════════
 async function api(action, payload = {}) {
   if (!API_URL) throw new Error('API not configured');
-  const params = new URLSearchParams({ action, ...payload });
+  const params = new URLSearchParams({ action, token: AUTH_TOKEN, ...payload });
   const res = await fetch(`${API_URL}?${params}`);
   const json = await res.json();
+  if (json.code === 401) { doLogout(); throw new Error('Session expired — please sign in again'); }
   if (json.error) throw new Error(json.error);
   return json;
 }
@@ -718,9 +910,10 @@ async function apiPost(action, payload = {}) {
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action, ...payload })
+    body: JSON.stringify({ action, token: AUTH_TOKEN, ...payload })
   });
   const json = await res.json();
+  if (json.code === 401) { doLogout(); throw new Error('Session expired — please sign in again'); }
   if (json.error) throw new Error(json.error);
   return json;
 }
@@ -1589,8 +1782,15 @@ function toast(msg, type='info') {
 // INIT
 // ═══════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', ()=>{
-  loadData();
-  if (!API_URL) setTimeout(()=>toast('No API configured — running in demo mode. Click ⚙ Configure API to connect.','info'), 800);
+  if (API_URL && AUTH_TOKEN) {
+    // We have a stored token — try to use it; server will reject if expired
+    hideLoginScreen();
+    loadData();
+  } else if (!API_URL) {
+    // No API at all — offer demo mode via the login screen
+    // (login screen is already visible by default)
+  }
+  // Otherwise login screen stays visible until the user signs in
 });
 </script>
 </body>

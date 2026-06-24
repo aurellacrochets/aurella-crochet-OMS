@@ -21,14 +21,78 @@ function doOptions(e) {
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// AUTH SYSTEM
+// Credentials are stored in Apps Script Properties (never in code).
+//
+// HOW TO SET UP USERS:
+//   1. In Apps Script editor → Project Settings → Script Properties
+//   2. Add a property named exactly:  auth_users
+//   3. Value is a JSON array of user objects, e.g.:
+//      [{"username":"alice","password":"mypass123"},{"username":"bob","password":"secure456"}]
+//
+// HOW TOKENS WORK:
+//   - On login, Apps Script generates a random token and stores it
+//     in Script Properties with key  token_<token>  and value  <expiry ISO string>
+//   - Tokens expire after TOKEN_TTL_HOURS hours
+//   - Every API call must send the token; it's validated server-side
+// ═══════════════════════════════════════════════════════════════════
+
+const TOKEN_TTL_HOURS = 8; // Token lifetime — adjust as needed
+
+function getUsers() {
+  const raw = PropertiesService.getScriptProperties().getProperty('auth_users');
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch(e) { return []; }
+}
+
+function validateToken(token) {
+  if (!token) return false;
+  const props = PropertiesService.getScriptProperties();
+  const expiry = props.getProperty('token_' + token);
+  if (!expiry) return false;
+  if (new Date() > new Date(expiry)) {
+    props.deleteProperty('token_' + token); // clean up expired token
+    return false;
+  }
+  return true;
+}
+
+function login(username, password) {
+  const users = getUsers();
+  const user = users.find(u => u.username === username && u.password === password);
+  if (!user) return { error: 'Invalid username or password' };
+
+  // Generate a secure random token
+  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  const expiry = new Date();
+  expiry.setHours(expiry.getHours() + TOKEN_TTL_HOURS);
+
+  PropertiesService.getScriptProperties().setProperty('token_' + token, expiry.toISOString());
+  return { ok: true, token, expiresAt: expiry.toISOString(), username: user.username };
+}
+
+function logout(token) {
+  if (token) PropertiesService.getScriptProperties().deleteProperty('token_' + token);
+  return { ok: true };
+}
+
 // ── GET router ───────────────────────────────────────────────────────
 function doGet(e) {
   try {
     const action = e.parameter.action;
+
+    // Login is the only unauthenticated GET (ping also allowed for API config test)
+    if (action === 'ping') return corsOutput({ ok: true });
+
+    // Auth check for all other GET requests
+    if (!validateToken(e.parameter.token)) {
+      return corsOutput({ error: 'Unauthorized', code: 401 });
+    }
+
     if (action === 'getOrders')  return corsOutput({ data: getSheetData(ORDERS_SHEET) });
     if (action === 'getItems')   return corsOutput({ data: getSheetData(ITEMS_SHEET) });
     if (action === 'getLog')     return corsOutput({ data: getLog(e.parameter.orderId) });
-    if (action === 'ping')       return corsOutput({ ok: true });
     return corsOutput({ error: 'Unknown action' });
   } catch(err) {
     return corsOutput({ error: err.message });
@@ -40,6 +104,15 @@ function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
     const action = body.action;
+
+    // Login is the only unauthenticated POST
+    if (action === 'login')  return corsOutput(login(body.username, body.password));
+    if (action === 'logout') return corsOutput(logout(body.token));
+
+    // Auth check for all other POST requests
+    if (!validateToken(body.token)) {
+      return corsOutput({ error: 'Unauthorized', code: 401 });
+    }
 
     if (action === 'createOrder') return corsOutput(createOrder(body));
     if (action === 'updateOrder') return corsOutput(updateOrder(body));
@@ -131,11 +204,6 @@ function updateOrder(body) {
 
   if (rowNum < 0) return { error: 'Order not found: ' + orderId };
 
-  const fieldMap = {
-    CustomerName:1, Phone:2, Address:3, Landmark:4, Pincode:5,
-    DeliveryType:6, Courier:7, AWB:8, PaymentStatus:9, OrderStatus:10
-  };
-  // Headers are 0-indexed; columns start at 1. Adjust per actual sheet columns.
   const headerIdx = {};
   headers.forEach((h,i) => headerIdx[h] = i+1);
 
@@ -147,15 +215,12 @@ function updateOrder(body) {
       changes.push(`${key}→${val}`);
     }
   });
-  // UpdatedAt
   const updCol = headerIdx['UpdatedAt'];
   if (updCol) sheet.getRange(rowNum, updCol).setValue(new Date().toISOString());
 
-  // Update products if provided
   if (products) {
     const itemSheet = getSheet(ITEMS_SHEET);
     const itemData  = itemSheet.getDataRange().getValues();
-    // Delete existing rows for this order (from bottom to avoid index shift)
     for (let i = itemData.length - 1; i >= 1; i--) {
       if (String(itemData[i][0]) === orderId) itemSheet.deleteRow(i+1);
     }
@@ -168,7 +233,7 @@ function updateOrder(body) {
 
 // ── bulkCreate ───────────────────────────────────────────────────────
 function bulkCreate(body) {
-  const { orders } = body; // array of { order, products }
+  const { orders } = body;
   let created = 0, skipped = 0;
   const existing = getSheetData(ORDERS_SHEET).map(o => o.OrderID);
 
@@ -182,7 +247,7 @@ function bulkCreate(body) {
 
 // ── bulkEdit ─────────────────────────────────────────────────────────
 function bulkEdit(body) {
-  const { updates } = body; // array of { orderId, fields }
+  const { updates } = body;
   let updated = 0, notFound = 0;
 
   updates.forEach(({ orderId, fields }) => {
