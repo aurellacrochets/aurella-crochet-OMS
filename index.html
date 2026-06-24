@@ -673,6 +673,10 @@ h3 { font-size: 16px; font-weight: 600; }
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       Bulk Edit
     </div>
+    <div class="nav-item" data-page="products">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      Products
+    </div>
     <div class="nav-item danger-nav" data-page="deleteorders">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
       Delete Orders
@@ -998,6 +1002,71 @@ h3 { font-size: 16px; font-weight: 600; }
   <div class="delete-list" id="delete-list"></div>
 </section>
 
+<!-- ═══ PRODUCTS ══════════════════════════════════════════════ -->
+<section class="page" id="page-products">
+  <div class="page-header">
+    <h2>Products</h2>
+    <p>Manage your product catalog — only Active products appear in orders and the Google Form</p>
+  </div>
+
+  <!-- Add Product Form -->
+  <div class="form-section" style="margin-bottom:24px">
+    <div class="form-section-title">Add New Product</div>
+    <div class="form-grid three">
+      <div class="form-group">
+        <label class="form-label">SKU <span class="req">*</span></label>
+        <input type="text" id="prod-sku" placeholder="e.g. HA-CC-BL" style="text-transform:uppercase">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Product Name <span class="req">*</span></label>
+        <input type="text" id="prod-name" placeholder="e.g. Crochet Clutcher">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <input type="text" id="prod-category" placeholder="e.g. Hair accessory">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Color</label>
+        <input type="text" id="prod-color" placeholder="e.g. Pink">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Price (₹) <span class="req">*</span></label>
+        <input type="number" id="prod-price" placeholder="899" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select id="prod-status">
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="submitAddProduct()">+ Add Product</button>
+    </div>
+  </div>
+
+  <!-- Products Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Product Name</th>
+          <th>Category</th>
+          <th>Color</th>
+          <th>Price</th>
+          <th>Status</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody id="products-table-body">
+        <tr><td colspan="7" class="table-empty">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
 </main>
 
 <!-- CONFIG MODAL -->
@@ -1076,6 +1145,7 @@ let AUTH_TOKEN = localStorage.getItem('aurella_token') || '';
 let AUTH_USER = localStorage.getItem('aurella_user') || '';
 let allOrders = [];
 let allItems  = [];
+let allProducts = [];
 let currentOrder = null;
 let activeStatusFilter = '';
 let pendingBcData = null;
@@ -1205,11 +1275,14 @@ async function apiPost(action, payload = {}) {
 async function loadData() {
   setApiStatus('loading');
   try {
-    const [ordersRes, itemsRes] = await Promise.all([api('getOrders'), api('getItems')]);
-    allOrders = ordersRes.data || [];
-    allItems  = itemsRes.data || [];
+    const [ordersRes, itemsRes, productsRes] = await Promise.all([
+      api('getOrders'), api('getItems'), api('getProducts')
+    ]);
+    allOrders   = ordersRes.data || [];
+    allItems    = itemsRes.data || [];
+    allProducts = productsRes.data || [];
     productNames = [...new Set(allItems.map(i => i.ProductName).filter(Boolean))];
-    renderOverview(); renderOrdersTable(); renderDeleteList();
+    renderOverview(); renderOrdersTable(); renderDeleteList(); renderProductsTable();
     setApiStatus('ok');
   } catch(e) {
     setApiStatus('err');
@@ -1719,22 +1792,54 @@ function recalcEditTotal() {
   if (el) el.textContent = fmtAmount(t);
 }
 
+// Build autocomplete suggestions from the Products catalog (Active only)
+function getCatalogSuggestions(q) {
+  const active = allProducts.filter(p => p.Status === 'Active');
+  // Build display names like "Crochet Clutcher – Pink"
+  return active
+    .map(p => ({
+      label: p.Color ? `${p.ProductName} – ${p.Color}` : p.ProductName,
+      price: parseFloat(p.Price) || 0,
+      sku: p.SKU
+    }))
+    .filter(s => s.label.toLowerCase().includes(q.toLowerCase()))
+    .slice(0, 10);
+}
+
 function filterAutocomplete(input) {
   const q = input.value.toLowerCase();
   const dropdown = input.nextElementSibling;
   if (!q) { dropdown.classList.remove('open'); return; }
-  const matches = productNames.filter(n=>n.toLowerCase().includes(q));
-  if (!matches.length) { dropdown.classList.remove('open'); return; }
-  dropdown.innerHTML = matches.slice(0,8).map(n=>`<div class="autocomplete-item" onmousedown="selectAutoComplete(event,'${esc(n)}')">${esc(n)}</div>`).join('');
+
+  // Prefer catalog products; fall back to names from past orders
+  let suggestions = getCatalogSuggestions(q);
+  if (!suggestions.length) {
+    const matches = productNames.filter(n => n.toLowerCase().includes(q));
+    if (!matches.length) { dropdown.classList.remove('open'); return; }
+    dropdown.innerHTML = matches.slice(0,8).map(n=>`<div class="autocomplete-item" onmousedown="selectAutoComplete(event,'${esc(n)}',null)">${esc(n)}</div>`).join('');
+  } else {
+    dropdown.innerHTML = suggestions.map(s =>
+      `<div class="autocomplete-item" onmousedown="selectAutoComplete(event,'${esc(s.label)}',${s.price})">
+        <span>${esc(s.label)}</span>
+        <span style="float:right;color:var(--accent2);font-size:12px">₹${s.price}</span>
+      </div>`
+    ).join('');
+  }
   dropdown.classList.add('open');
   input.onblur = () => setTimeout(()=>dropdown.classList.remove('open'), 150);
 }
 
-function selectAutoComplete(e, name) {
+function selectAutoComplete(e, name, price) {
   e.preventDefault();
-  const input = e.target.closest('.product-autocomplete').querySelector('.prod-name');
-  input.value = name;
-  input.nextElementSibling.classList.remove('open');
+  const wrap = e.target.closest('.product-autocomplete');
+  wrap.querySelector('.prod-name').value = name;
+  wrap.nextElementSibling.classList.remove('open'); // close dropdown
+  if (price !== null) {
+    // Auto-fill price field in the same product row
+    const row = wrap.closest('.product-row');
+    if (row) { row.querySelector('.prod-price').value = price; recalcTotal(); }
+  }
+  wrap.querySelector('.autocomplete-dropdown').classList.remove('open');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2015,6 +2120,7 @@ function navigate(page) {
   document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
   if (page==='neworder') initNewOrderPage();
   if (page==='deleteorders') renderDeleteList();
+  if (page==='products') renderProductsTable();
   window.scrollTo(0,0); closeSidebar();
 }
 document.querySelectorAll('.nav-item').forEach(item=>{
@@ -2048,6 +2154,69 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ═══════════════════════════════════════════════════════════
+// PRODUCTS PAGE
+// ═══════════════════════════════════════════════════════════
+function renderProductsTable() {
+  const tbody = document.getElementById('products-table-body');
+  if (!tbody) return;
+  if (!allProducts.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">No products yet — add one above</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = allProducts.map(p => `
+    <tr>
+      <td style="font-family:monospace;font-size:12px;color:var(--accent2)">${esc(p.SKU)}</td>
+      <td>${esc(p.ProductName)}</td>
+      <td style="color:var(--muted)">${esc(p.Category||'—')}</td>
+      <td style="color:var(--muted)">${esc(p.Color||'—')}</td>
+      <td class="amount-cell">${fmtAmount(parseFloat(p.Price)||0)}</td>
+      <td>${p.Status==='Active'
+        ? `<span class="badge badge-paid">Active</span>`
+        : `<span class="badge badge-cancelled">Inactive</span>`}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="toggleProductStatus('${esc(p.SKU)}','${p.Status==='Active'?'Inactive':'Active'}')">
+          ${p.Status==='Active' ? 'Deactivate' : 'Activate'}
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+async function submitAddProduct() {
+  const sku      = document.getElementById('prod-sku').value.trim().toUpperCase();
+  const name     = document.getElementById('prod-name').value.trim();
+  const category = document.getElementById('prod-category').value.trim();
+  const color    = document.getElementById('prod-color').value.trim();
+  const price    = document.getElementById('prod-price').value.trim();
+  const status   = document.getElementById('prod-status').value;
+
+  if (!sku || !name || !price) { toast('SKU, Product Name and Price are required', 'error'); return; }
+
+  try {
+    await apiPost('addProduct', { sku, productName: name, category, color, price: parseFloat(price), status });
+    allProducts.push({ SKU: sku, ProductName: name, Category: category, Color: color, Price: price, Status: status });
+    renderProductsTable();
+    // Clear the form
+    ['prod-sku','prod-name','prod-category','prod-color','prod-price'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('prod-status').value = 'Active';
+    toast(`Product ${sku} added`, 'success');
+  } catch(e) {
+    toast(e.message || 'Failed to add product', 'error');
+  }
+}
+
+async function toggleProductStatus(sku, newStatus) {
+  try {
+    await apiPost('updateProduct', { sku, fields: { Status: newStatus } });
+    const p = allProducts.find(x => x.SKU === sku);
+    if (p) p.Status = newStatus;
+    renderProductsTable();
+    toast(`${sku} set to ${newStatus}`, 'success');
+  } catch(e) {
+    toast(e.message || 'Failed to update product', 'error');
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 // TOAST
