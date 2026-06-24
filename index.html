@@ -1286,7 +1286,12 @@ async function loadData() {
     setApiStatus('ok');
   } catch(e) {
     setApiStatus('err');
-    loadDemoData();
+    // Only fall back to demo if there's no token (genuinely not logged in)
+    if (!AUTH_TOKEN) {
+      loadDemoData();
+    } else {
+      toast('Could not connect to API: ' + e.message, 'error');
+    }
   }
 }
 
@@ -2233,14 +2238,10 @@ function toast(msg, type='info') {
 // ═══════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', ()=>{
   if (API_URL && AUTH_TOKEN) {
-    // We have a stored token — try to use it; server will reject if expired
     hideLoginScreen();
     loadData();
-  } else if (!API_URL) {
-    // No API at all — offer demo mode via the login screen
-    // (login screen is already visible by default)
   }
-  // Otherwise login screen stays visible until the user signs in
+  // No token = stay on login screen
 });
 </script>
 </body>
