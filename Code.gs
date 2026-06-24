@@ -109,7 +109,7 @@ function createOrder(body) {
 
   sheet.appendRow([
     order.OrderID, order.CustomerName, order.Phone, order.Address,
-    order.Landmark||'', order.City||'', order.Pincode, order.DeliveryType, order.Courier||'',
+    order.Landmark, order.City||'', order.Pincode, order.DeliveryType, order.Courier||'',
     order.AWB||'', order.PaymentStatus, order.OrderStatus, now, now
   ]);
 
@@ -132,8 +132,8 @@ function updateOrder(body) {
   if (rowNum < 0) return { error: 'Order not found: ' + orderId };
 
   const fieldMap = {
-    CustomerName:1, Phone:2, Address:3, Landmark:4, City:5, Pincode:6,
-    DeliveryType:7, Courier:8, AWB:9, PaymentStatus:10, OrderStatus:11
+    CustomerName:1, Phone:2, Address:3, Landmark:4, Pincode:5,
+    DeliveryType:6, Courier:7, AWB:8, PaymentStatus:9, OrderStatus:10
   };
   // Headers are 0-indexed; columns start at 1. Adjust per actual sheet columns.
   const headerIdx = {};
