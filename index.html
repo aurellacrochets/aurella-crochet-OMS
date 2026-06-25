@@ -1140,7 +1140,7 @@ function numericKeydown(e) {
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
-let API_URL = localStorage.getItem('aurella_api') || 'https://script.google.com/macros/s/AKfycbx5n36HVpGPgI4YQ0pMIgpiP7g_xQRG_LBvF_C9q87W4BkCfQ-TFT-ztgR1_BfZp-TvPA/exec';
+let API_URL = localStorage.getItem('aurella_api') || 'https://script.google.com/macros/s/AKfycbx4rX8KMoEQl9y7x21oPtPIFFgwtbsm9l8bL0mJxfhaHyQPl0aoEIjidQVXnj5dKtrt0A/exec';
 let AUTH_TOKEN = localStorage.getItem('aurella_token') || '';
 let AUTH_USER = localStorage.getItem('aurella_user') || '';
 let allOrders = [];
@@ -1286,12 +1286,7 @@ async function loadData() {
     setApiStatus('ok');
   } catch(e) {
     setApiStatus('err');
-    // Only fall back to demo if there's no token (genuinely not logged in)
-    if (!AUTH_TOKEN) {
-      loadDemoData();
-    } else {
-      toast('Could not connect to API: ' + e.message, 'error');
-    }
+    loadDemoData();
   }
 }
 
@@ -2098,9 +2093,15 @@ function exportCSV() {
   downloadCSV(csv, `aurella-orders-${new Date().toISOString().slice(0,10)}.csv`);
 }
 function downloadCSV(content, filename) {
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([content],{type:'text/csv'}));
-  a.download=filename; a.click();
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2238,10 +2239,14 @@ function toast(msg, type='info') {
 // ═══════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', ()=>{
   if (API_URL && AUTH_TOKEN) {
+    // We have a stored token — try to use it; server will reject if expired
     hideLoginScreen();
     loadData();
+  } else if (!API_URL) {
+    // No API at all — offer demo mode via the login screen
+    // (login screen is already visible by default)
   }
-  // No token = stay on login screen
+  // Otherwise login screen stays visible until the user signs in
 });
 </script>
 </body>
