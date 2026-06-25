@@ -1140,7 +1140,7 @@ function numericKeydown(e) {
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
-let API_URL = localStorage.getItem('aurella_api') || 'https://script.google.com/macros/s/AKfycbyVIq2p1jwI-w3f6pI70pi7bYFet6SX6xTWbH2lczPuUDWMl6oBBAGJKUkhgWYJiHuJXQ/exec';
+let API_URL = localStorage.getItem('aurella_api') || 'https://script.google.com/macros/s/AKfycbx4rX8KMoEQl9y7x21oPtPIFFgwtbsm9l8bL0mJxfhaHyQPl0aoEIjidQVXnj5dKtrt0A/exec';
 let AUTH_TOKEN = localStorage.getItem('aurella_token') || '';
 let AUTH_USER = localStorage.getItem('aurella_user') || '';
 let allOrders = [];
@@ -1471,7 +1471,7 @@ function renderDetail() {
       </div>
       <div class="table-wrap product-table-mini" id="detail-products-view">
         <table>
-          <thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead>
+          <thead><tr><th>Product</th><th>Color</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead>
           <tbody id="detail-products-body"></tbody>
         </table>
       </div>
@@ -1519,7 +1519,10 @@ function df(label, field, o, type) {
 function renderDetailProducts(items) {
   document.getElementById('detail-products-body').innerHTML = items.map(i => {
     const sub = (parseFloat(i.Price)||0)*(parseInt(i.Quantity)||1);
-    return `<tr><td>${esc(i.ProductName)}</td><td>${i.Quantity}</td><td>${fmtAmount(parseFloat(i.Price)||0)}</td><td style="font-weight:600;color:var(--accent2)">${fmtAmount(sub)}</td></tr>`;
+    const parts = (i.ProductName||'').split(' – ');
+    const name = parts[0] || i.ProductName;
+    const color = parts[1] || '—';
+    return `<tr><td>${esc(name)}</td><td style="color:var(--muted)">${esc(color)}</td><td>${i.Quantity}</td><td>${fmtAmount(parseFloat(i.Price)||0)}</td><td style="font-weight:600;color:var(--accent2)">${fmtAmount(sub)}</td></tr>`;
   }).join('') || `<tr><td colspan="4" style="color:var(--muted);padding:12px">No products</td></tr>`;
 }
 
