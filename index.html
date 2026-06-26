@@ -608,6 +608,10 @@ h3 { font-size: 16px; font-weight: 600; }
   transition: all .15s;
 }
 .logout-btn:hover { color: var(--red); border-color: #7f2020; }
+  /* ─── DATE RANGE PICKER ──────────────────────────────────── */
+.date-range-wrap { display: flex; align-items: center; gap: 6px; }
+.date-range-wrap input[type="date"] { max-width: 135px; }
+.date-range-sep { color: var(--muted); font-size: 12px; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -804,8 +808,11 @@ h3 { font-size: 16px; font-weight: 600; }
       <option value="price-high">Price: High → Low</option>
       <option value="price-low">Price: Low → High</option>
     </select>
-    <input type="date" id="filter-date-from" onchange="renderOrdersTable()" title="From date" style="max-width:145px">
-    <input type="date" id="filter-date-to" onchange="renderOrdersTable()" title="To date" style="max-width:145px">
+    <div class="date-range-wrap">
+      <input type="date" id="filter-date-from" onchange="renderOrdersTable()" title="From date">
+      <span class="date-range-sep">→</span>
+      <input type="date" id="filter-date-to" onchange="renderOrdersTable()" title="To date">
+    </div>
     <button class="btn btn-secondary btn-sm" onclick="clearDateRange()">✕ Date</button>
     <button class="btn btn-secondary btn-sm" onclick="exportCSV()">↓ Export CSV</button>
   </div>
