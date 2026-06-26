@@ -944,7 +944,7 @@ h3 { font-size: 16px; font-weight: 600; }
   </div>
   <div class="config-notice">
     <strong>CSV Format:</strong><br>
-    <code>Order ID,Customer Name,Phone Number,Address,Landmark,Pincode,Delivery Type,Payment Status,Order Status,Product Name,Quantity,Price</code><br><br>
+    <code>Order ID,Customer Name,Phone Number,Address,Landmark,City,Pincode,Delivery Type,Payment Status,Order Status,Product Name,Quantity,Price</code><br><br>
     One row per product. Repeat order-level fields for each product row. Orders with existing IDs will be <strong>skipped</strong>.
     <div style="margin-top:10px;"><button class="btn btn-secondary btn-sm" onclick="downloadBulkCreateTemplate()">↓ Download Template</button></div>
   </div>
@@ -974,7 +974,7 @@ h3 { font-size: 16px; font-weight: 600; }
   </div>
   <div class="config-notice">
     <strong>CSV Format:</strong><br>
-    <code>Order ID,Customer Name,Phone Number,Address,Landmark,Pincode,Delivery Type,Courier,AWB Number,Payment Status,Order Status</code><br><br>
+    <code>Order ID,Customer Name,Phone Number,Address,Landmark,City,Pincode,Delivery Type,Courier,AWB Number,Payment Status,Order Status</code><br><br>
     Leave any column <strong>empty</strong> to keep the existing value. Order ID is required.
     <div style="margin-top:10px;"><button class="btn btn-secondary btn-sm" onclick="downloadBulkEditTemplate()">↓ Download Template</button></div>
   </div>
@@ -1997,7 +1997,7 @@ async function confirmDelete() {
 // ═══════════════════════════════════════════════════════════
 // BULK CREATE
 // ═══════════════════════════════════════════════════════════
-const BC_HEADERS = ['Order ID','Customer Name','Phone Number','Address','Landmark','Pincode','Delivery Type','Payment Status','Order Status','Product Name','Quantity','Price'];
+const BC_HEADERS = ['Order ID','Customer Name','Phone Number','Address','Landmark','City','Pincode','Delivery Type','Payment Status','Order Status','Product Name','Quantity','Price'];
 
 function handleCSVDrop(e, prefix) {
   e.preventDefault();
@@ -2026,7 +2026,7 @@ function parseBulkCreate(text) {
     if (!id) return;
     if (!grouped[id]) grouped[id] = {
       OrderID:id, CustomerName:r['Customer Name'], Phone:r['Phone Number'],
-      Address:r['Address'], Landmark:r['Landmark'], Pincode:r['Pincode'],
+      Address:r['Address'], Landmark:r['Landmark'], City:r['City'], Pincode:r['Pincode'],
       DeliveryType:r['Delivery Type'], PaymentStatus:r['Payment Status'],
       OrderStatus:r['Order Status'], products:[]
     };
@@ -2091,6 +2091,7 @@ function parseBulkEdit(text) {
     if (r['Phone Number']?.trim()) changes.Phone=r['Phone Number'].trim();
     if (r['Address']?.trim()) changes.Address=r['Address'].trim();
     if (r['Landmark']?.trim()) changes.Landmark=r['Landmark'].trim();
+    if (r['City']?.trim()) changes.City=r['City'].trim();
     if (r['Pincode']?.trim()) changes.Pincode=r['Pincode'].trim();
     if (r['Delivery Type']?.trim()) changes.DeliveryType=r['Delivery Type'].trim();
     if (r['Courier']?.trim()) changes.Courier=r['Courier'].trim();
@@ -2128,9 +2129,9 @@ async function applyBulkEdit() {
 }
 
 function downloadBulkEditTemplate() {
-  const csv = 'Order ID,Customer Name,Phone Number,Address,Landmark,Pincode,Delivery Type,Courier,AWB Number,Payment Status,Order Status\n' +
-    'AUR-0001,,,,,,,,,Paid,\n' +
-    'AUR-0002,,,,,,,Delhivery,DEL123456,,In Transit\n';
+  const csv = 'Order ID,Customer Name,Phone Number,Address,Landmark,City,Pincode,Delivery Type,Courier,AWB Number,Payment Status,Order Status\n' +
+  'AUR-0001,,,,,,,,,,Paid,\n' +
+  'AUR-0002,,,,,,,,Delhivery,DEL123456,,In Transit\n';
   downloadCSV(csv, 'aurella-bulk-edit-template.csv');
 }
 
