@@ -2015,7 +2015,11 @@ async function confirmDelete() {
 
   try {
     await apiPost('deleteOrder', { orderId: orderToDelete });
-  } catch(e) {}
+  } catch(e) {
+    toast(e.message || 'Delete failed', 'error');
+    btn.disabled=false; btn.textContent='Delete Permanently';
+    return;
+  }
 
   allOrders = allOrders.filter(o=>o.OrderID!==orderToDelete);
   allItems  = allItems.filter(i=>i.OrderID!==orderToDelete);
