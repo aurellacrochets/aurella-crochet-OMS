@@ -1887,7 +1887,8 @@ function getCatalogSuggestions(q) {
   // Build display names like "Crochet Clutcher – Pink"
   return active
     .map(p => ({
-      label: p.Color ? `${p.ProductName} – ${p.Color}` : p.ProductName,
+      const name = p.ProductName || p['Product Name'] || '';
+      label: p.Color ? `${name} – ${p.Color}` : name,
       price: parseFloat(p.Price) || 0,
       sku: p.SKU
     }))
@@ -2263,7 +2264,7 @@ function renderProductsTable() {
   tbody.innerHTML = allProducts.map(p => `
     <tr>
       <td style="font-family:monospace;font-size:12px;color:var(--accent2)">${esc(p.SKU)}</td>
-      <td>${esc(p.ProductName)}</td>
+      <td>${esc(p.ProductName || p['Product Name'] || '—')}</td>
       <td style="color:var(--muted)">${esc(p.Category||'—')}</td>
       <td style="color:var(--muted)">${esc(p.Color||'—')}</td>
       <td class="amount-cell">${fmtAmount(parseFloat(p.Price)||0)}</td>
