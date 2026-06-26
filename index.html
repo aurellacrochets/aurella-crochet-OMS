@@ -1887,8 +1887,7 @@ function getCatalogSuggestions(q) {
   // Build display names like "Crochet Clutcher – Pink"
   return active
     .map(p => ({
-      const name = p.ProductName || p['Product Name'] || '';
-      label: p.Color ? `${name} – ${p.Color}` : name,
+      label: p.Color ? `${p.ProductName || p['Product Name'] || ''} – ${p.Color}` : (p.ProductName || p['Product Name'] || ''),
       price: parseFloat(p.Price) || 0,
       sku: p.SKU
     }))
