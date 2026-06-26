@@ -608,11 +608,9 @@ h3 { font-size: 16px; font-weight: 600; }
   transition: all .15s;
 }
 .logout-btn:hover { color: var(--red); border-color: #7f2020; }
-  /* ─── DATE RANGE PICKER ──────────────────────────────────── */
-.date-range-wrap { display: flex; align-items: center; gap: 6px; }
-.date-range-wrap input[type="date"] { max-width: 135px; }
-.date-range-sep { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  
 </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body>
 
@@ -808,11 +806,7 @@ h3 { font-size: 16px; font-weight: 600; }
       <option value="price-high">Price: High → Low</option>
       <option value="price-low">Price: Low → High</option>
     </select>
-    <div class="date-range-wrap">
-      <input type="date" id="filter-date-from" onchange="renderOrdersTable()" title="From date">
-      <span class="date-range-sep">→</span>
-      <input type="date" id="filter-date-to" onchange="renderOrdersTable()" title="To date">
-    </div>
+    <input type="text" id="filter-date-range" placeholder="Date range…" readonly style="max-width:200px;cursor:pointer">
     <button class="btn btn-secondary btn-sm" onclick="clearDateRange()">✕ Date</button>
     <button class="btn btn-secondary btn-sm" onclick="exportCSV()">↓ Export CSV</button>
   </div>
@@ -1408,8 +1402,8 @@ function renderOrdersTable() {
     }
     return true;
   }).filter(o => {
-    const from = document.getElementById('filter-date-from').value;
-    const to   = document.getElementById('filter-date-to').value;
+    const from = window._dateFrom || '';
+    const to   = window._dateTo   || '';
     if (from && new Date(o.CreatedAt) < new Date(from)) return false;
     if (to   && new Date(o.CreatedAt) > new Date(to + 'T23:59:59')) return false;
     return true;
@@ -1442,8 +1436,7 @@ function renderOrdersTable() {
 }
 
 function clearDateRange() {
-  document.getElementById('filter-date-from').value = '';
-  document.getElementById('filter-date-to').value = '';
+  if (window._dateRangePicker) window._dateRangePicker.clear();
   renderOrdersTable();
 }
 
@@ -2456,5 +2449,19 @@ async function saveEditProduct() {
     </div>
   </div>
 </div>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+  window._dateFrom = '';
+  window._dateTo   = '';
+  window._dateRangePicker = flatpickr('#filter-date-range', {
+    mode: 'range',
+    dateFormat: 'd/m/Y',
+    onChange: function(selectedDates) {
+      window._dateFrom = selectedDates[0] ? selectedDates[0].toISOString().split('T')[0] : '';
+      window._dateTo   = selectedDates[1] ? selectedDates[1].toISOString().split('T')[0] : '';
+      renderOrdersTable();
+    }
+  });
+</script>
 </body>
 </html>
