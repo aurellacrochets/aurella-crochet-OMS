@@ -165,6 +165,7 @@ h3 { font-size: 16px; font-weight: 600; }
 .products-header { display: flex; gap: 8px; padding: 0 0 6px; margin-bottom: 2px; }
 .products-header span { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 .ph-name  { flex: 4; }
+.ph-color { flex: 1.5; min-width: 70px; }
 .ph-qty   { flex: 1; min-width: 60px; }
 .ph-price { flex: 1.5; min-width: 80px; }
 .ph-del   { width: 34px; flex-shrink: 0; }
@@ -188,6 +189,16 @@ h3 { font-size: 16px; font-weight: 600; }
 .log-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
 .log-text { font-size: 13px; color: var(--text); }
 .log-time { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ─── PRODUCTS IN ORDERS TABLE ───────────────────────────────── */
+.prod-pill { display: inline-flex; align-items: center; gap: 5px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; font-size: 11px; color: var(--text); white-space: nowrap; }
+.prod-more-btn { background: none; border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; font-size: 11px; color: var(--accent2); cursor: pointer; white-space: nowrap; }
+.prod-more-btn:hover { background: var(--surface2); }
+.prod-dropdown-wrap { position: relative; display: inline-block; vertical-align: middle; }
+.prod-dropdown-list { position: absolute; top: calc(100% + 4px); left: 0; z-index: 300; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px; display: none; min-width: 210px; box-shadow: 0 4px 20px rgba(0,0,0,.5); }
+.prod-dropdown-list.open { display: flex; flex-direction: column; gap: 4px; }
+.prod-dropdown-item { font-size: 12px; color: var(--text); padding: 5px 8px; border-radius: 4px; white-space: nowrap; }
+.prod-cell { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; }
 
 /* ─── BULK CSV ───────────────────────────────────────────── */
 .csv-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 32px; text-align: center; cursor: pointer; transition: border-color .15s; color: var(--muted); }
@@ -791,8 +802,8 @@ h3 { font-size: 16px; font-weight: 600; }
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Order ID</th><th>Customer</th><th>Phone</th><th>Amount</th><th>Payment</th><th>Status</th><th>Courier / AWB</th><th>Updated</th></tr></thead>
-      <tbody id="orders-table-body"><tr><td colspan="8" class="table-empty">Loading…</td></tr></tbody>
+      <thead><tr><th>Order ID</th><th>Customer</th><th>Phone</th><th>Products</th><th>Amount</th><th>Payment</th><th>Status</th><th>Courier / AWB</th><th>Updated</th></tr></thead>
+      <tbody id="orders-table-body"><tr><td colspan="9" class="table-empty">Loading…</td></tr></tbody>
     </table>
   </div>
   <div id="orders-count" style="margin-top:10px;color:var(--muted);font-size:12px;"></div>
@@ -906,6 +917,7 @@ h3 { font-size: 16px; font-weight: 600; }
     <div class="form-section-title">Products</div>
     <div class="products-header">
       <span class="ph-name">Product Name <span style="color:var(--red)">*</span></span>
+      <span class="ph-color">Color</span>
       <span class="ph-qty">Qty <span style="color:var(--red)">*</span></span>
       <span class="ph-price">Price (₹) <span style="color:var(--red)">*</span></span>
       <span class="ph-del"></span>
@@ -1383,17 +1395,19 @@ function renderOrdersTable() {
   document.getElementById('orders-table-body').innerHTML = filtered.map(o => {
     const amt = orderAmount(o.OrderID);
     const courierCell = buildCourierCell(o);
+    const prodCell = buildOrderProductsCell(o.OrderID);
     return `<tr class="order-row" onclick="openOrder('${o.OrderID}')">
       <td class="tbl-link">${o.OrderID}</td>
       <td>${esc(o.CustomerName)}</td>
       <td style="font-family:monospace;font-size:12px">${o.Phone||''}</td>
+      <td onclick="event.stopPropagation()">${prodCell}</td>
       <td class="amount-cell">${fmtAmount(amt)}</td>
       <td>${payBadge(o.PaymentStatus)}</td>
       <td>${statusBadge(o.OrderStatus)}</td>
       <td class="courier-cell" onclick="event.stopPropagation()">${courierCell}</td>
       <td style="color:var(--muted);font-size:12px">${fmtDate(o.UpdatedAt||o.CreatedAt)}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="8" class="table-empty">No orders match your filters</td></tr>`;
+  }).join('') || `<tr><td colspan="9" class="table-empty">No orders match your filters</td></tr>`;
 
   document.getElementById('orders-count').textContent = `Showing ${filtered.length} of ${allOrders.length} orders`;
 }
@@ -1406,6 +1420,61 @@ function buildCourierCell(o) {
   const url = `https://www.delhivery.com/track-v2/package/${encodeURIComponent(awb)}`;
   return `<div style="color:var(--muted);font-size:11px">${courier}</div><a class="awb-link" href="${url}" target="_blank" rel="noopener">${esc(awb)} ↗</a>`;
 }
+
+function buildOrderProductsCell(orderId) {
+  const items = allItems.filter(i => i.OrderID === orderId);
+  if (!items.length) return '<span style="color:var(--muted)">—</span>';
+  const uid = `pd-${orderId.replace(/[^a-z0-9]/gi,'_')}`;
+
+  function getNameColor(i) {
+    let name = i.ProductName || '—';
+    let color = i.Color || '';
+    if (!color) {
+      const parts = name.split(' – ');
+      if (parts.length > 1) { name = parts[0]; color = parts.slice(1).join(' – '); }
+    }
+    return { name, color };
+  }
+
+  const { name: fn, color: fc } = getNameColor(items[0]);
+  const fq = items[0].Quantity || 1;
+  const firstLabel = fc
+    ? `${esc(fn)} <span style="color:var(--muted);font-size:10px">${esc(fc)}</span> <span style="color:var(--muted)">×${fq}</span>`
+    : `${esc(fn)} <span style="color:var(--muted)">×${fq}</span>`;
+
+  if (items.length === 1) {
+    return `<div class="prod-cell"><span class="prod-pill">${firstLabel}</span></div>`;
+  }
+
+  const rest = items.slice(1);
+  const restHtml = rest.map(i => {
+    const { name: n, color: c } = getNameColor(i);
+    const q = i.Quantity || 1;
+    return `<div class="prod-dropdown-item">${esc(n)}${c ? ` <span style="color:var(--muted);font-size:10px">${esc(c)}</span>` : ''} <span style="color:var(--muted)">×${q}</span></div>`;
+  }).join('');
+
+  return `<div class="prod-cell">
+    <span class="prod-pill">${firstLabel}</span>
+    <div class="prod-dropdown-wrap">
+      <button class="prod-more-btn" onclick="toggleProdDropdown('${uid}')">+${rest.length} more ▾</button>
+      <div class="prod-dropdown-list" id="${uid}">${restHtml}</div>
+    </div>
+  </div>`;
+}
+
+function toggleProdDropdown(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const isOpen = el.classList.contains('open');
+  // Close all other open dropdowns first
+  document.querySelectorAll('.prod-dropdown-list.open').forEach(d => d.classList.remove('open'));
+  if (!isOpen) el.classList.add('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.prod-dropdown-wrap')) {
+    document.querySelectorAll('.prod-dropdown-list.open').forEach(d => d.classList.remove('open'));
+  }
+});
 
 // Status tabs
 document.getElementById('status-tabs').addEventListener('click', e => {
@@ -1460,8 +1529,8 @@ function renderDetail() {
         </div>
         ${df('Payment Status','PaymentStatus',o,'select-payment')}
         ${df('Order Status','OrderStatus',o,'select-status')}
-        <div class="detail-block"><div class="detail-key">Created</div><div class="detail-val">${fmtDate(o.CreatedAt)}</div></div>
-        <div class="detail-block"><div class="detail-key">Updated</div><div class="detail-val">${fmtDate(o.UpdatedAt)}</div></div>
+        <div class="detail-block"><div class="detail-key">Created</div><div class="detail-val">${fmtDate(o.CreatedAt)} <span style="font-size:11px;color:var(--muted)">(immutable)</span></div></div>
+        <div class="detail-block"><div class="detail-key">Last Updated</div><div class="detail-val">${fmtDate(o.UpdatedAt)}</div></div>
       </div>
     </div>
     <div class="section">
@@ -1477,7 +1546,7 @@ function renderDetail() {
       </div>
       <div id="edit-products-wrap" style="display:none">
         <div class="products-header">
-          <span class="ph-name">Product Name</span><span class="ph-qty">Qty</span><span class="ph-price">Price (₹)</span><span class="ph-del"></span>
+          <span class="ph-name">Product Name</span><span class="ph-color">Color</span><span class="ph-qty">Qty</span><span class="ph-price">Price (₹)</span><span class="ph-del"></span>
         </div>
         <div class="products-list" id="edit-products-list"></div>
         <button type="button" class="btn btn-secondary btn-sm" id="add-prod-btn" onclick="addProductRow('edit')" style="display:none">+ Add Product</button>
@@ -1487,7 +1556,7 @@ function renderDetail() {
     <div class="section">
       <div class="section-title">Activity Log</div>
       <div class="log-list" id="activity-log">
-        <div class="log-item"><div class="log-dot"></div><div><div class="log-text">Order created</div><div class="log-time">${fmtDate(o.CreatedAt)}</div></div></div>
+        <div class="log-item"><div class="log-dot"></div><div><div class="log-text">Order created${o.CreatedBy ? ` <span style="color:var(--accent2);font-size:11px">by ${esc(o.CreatedBy)}</span>` : ''}</div><div class="log-time">${fmtDate(o.CreatedAt)}</div></div></div>
       </div>
     </div>`;
 
@@ -1519,11 +1588,15 @@ function df(label, field, o, type) {
 function renderDetailProducts(items) {
   document.getElementById('detail-products-body').innerHTML = items.map(i => {
     const sub = (parseFloat(i.Price)||0)*(parseInt(i.Quantity)||1);
-    const parts = (i.ProductName||'').split(' – ');
-    const name = parts[0] || i.ProductName;
-    const color = parts[1] || '—';
-    return `<tr><td>${esc(name)}</td><td style="color:var(--muted)">${esc(color)}</td><td>${i.Quantity}</td><td>${fmtAmount(parseFloat(i.Price)||0)}</td><td style="font-weight:600;color:var(--accent2)">${fmtAmount(sub)}</td></tr>`;
-  }).join('') || `<tr><td colspan="4" style="color:var(--muted);padding:12px">No products</td></tr>`;
+    // Support both dedicated Color field and legacy "Name – Color" format
+    let name = i.ProductName || '—';
+    let color = i.Color || '';
+    if (!color) {
+      const parts = name.split(' – ');
+      if (parts.length > 1) { name = parts[0]; color = parts.slice(1).join(' – '); }
+    }
+    return `<tr><td>${esc(name)}</td><td style="color:var(--muted)">${esc(color)||'—'}</td><td>${i.Quantity}</td><td>${fmtAmount(parseFloat(i.Price)||0)}</td><td style="font-weight:600;color:var(--accent2)">${fmtAmount(sub)}</td></tr>`;
+  }).join('') || `<tr><td colspan="5" style="color:var(--muted);padding:12px">No products</td></tr>`;
 }
 
 async function loadActivityLog(orderId) {
@@ -1533,7 +1606,13 @@ async function loadActivityLog(orderId) {
     if (!logs.length) return;
     const el = document.getElementById('activity-log');
     if (!el) return;
-    el.innerHTML = logs.map(l=>`<div class="log-item"><div class="log-dot"></div><div><div class="log-text">${esc(l.Description)}</div><div class="log-time">${fmtDate(l.Timestamp)}</div></div></div>`).join('');
+    el.innerHTML = logs.map(l => {
+      const editor = l.EditedBy ? `<span style="color:var(--accent2);font-size:11px">by ${esc(l.EditedBy)}</span>` : '';
+      return `<div class="log-item"><div class="log-dot"></div><div>
+        <div class="log-text">${esc(l.Description)} ${editor}</div>
+        <div class="log-time">${fmtDate(l.Timestamp)}</div>
+      </div></div>`;
+    }).join('');
   } catch(e) {}
 }
 
@@ -1565,7 +1644,7 @@ function enterEditMode() {
   const items = allItems.filter(i => i.OrderID === currentOrder.OrderID);
   const list = document.getElementById('edit-products-list');
   list.innerHTML = '';
-  items.forEach(item => addProductRow('edit', item.ProductName, item.Quantity, item.Price));
+  items.forEach(item => addProductRow('edit', item.ProductName, item.Quantity, item.Price, item.Color||''));
   recalcEditTotal();
 }
 
@@ -1589,13 +1668,14 @@ async function saveOrder() {
   const products = [];
   rows.forEach(row => {
     const name = row.querySelector('.prod-name')?.value?.trim();
+    const color = row.querySelector('.prod-color')?.value?.trim() || '';
     const qty  = parseInt(row.querySelector('.prod-qty')?.value)||1;
     const price = parseFloat(row.querySelector('.prod-price')?.value)||0;
-    if (name) products.push({ ProductName: name, Quantity: qty, Price: price });
+    if (name) products.push({ ProductName: name, Color: color, Quantity: qty, Price: price });
   });
 
   try {
-    await apiPost('updateOrder', { orderId: currentOrder.OrderID, fields: updated, products });
+    await apiPost('updateOrder', { orderId: currentOrder.OrderID, fields: updated, products, editedBy: AUTH_USER || 'unknown' });
   } catch(e) {}
 
   const idx = allOrders.findIndex(o=>o.OrderID===currentOrder.OrderID);
@@ -1683,10 +1763,11 @@ async function submitNewOrder(e) {
   let productError = false;
   rows.forEach(row => {
     const name  = row.querySelector('.prod-name')?.value?.trim();
+    const color = row.querySelector('.prod-color')?.value?.trim() || '';
     const qty   = parseInt(row.querySelector('.prod-qty')?.value)||0;
     const price = parseFloat(row.querySelector('.prod-price')?.value);
     if (!name || !qty || isNaN(price) || price < 0) { productError = true; }
-    else products.push({ ProductName: name, Quantity: qty, Price: price });
+    else products.push({ ProductName: name, Color: color, Quantity: qty, Price: price });
   });
 
   if (productError || !products.length) { toast('Each product needs a name, quantity, and price', 'error'); return; }
@@ -1708,6 +1789,7 @@ async function submitNewOrder(e) {
     AWB: document.getElementById('no-awb').value.trim(),
     PaymentStatus: document.getElementById('no-payment').value,
     OrderStatus: document.getElementById('no-status').value,
+    CreatedBy: AUTH_USER || '',
     CreatedAt: new Date().toISOString(), UpdatedAt: new Date().toISOString(),
   };
 
@@ -1739,7 +1821,7 @@ function resetNewOrderForm() {
 // ═══════════════════════════════════════════════════════════
 // PRODUCT ROWS (shared for new / edit)
 // ═══════════════════════════════════════════════════════════
-function addProductRow(prefix, name='', qty=1, price='') {
+function addProductRow(prefix, name='', qty=1, price='', color='') {
   const container = prefix==='edit'
     ? document.getElementById('edit-products-list')
     : document.getElementById('no-products-list');
@@ -1751,6 +1833,9 @@ function addProductRow(prefix, name='', qty=1, price='') {
     <div class="product-autocomplete" style="flex:4;min-width:0">
       <input type="text" class="prod-name" placeholder="Product name" value="${esc(name)}" autocomplete="off" oninput="filterAutocomplete(this)" required>
       <div class="autocomplete-dropdown"></div>
+    </div>
+    <div style="flex:1.5;min-width:70px">
+      <input type="text" class="prod-color" placeholder="Color" value="${esc(color)}">
     </div>
     <div class="prod-qty-wrap">
       <input type="number" class="prod-qty" placeholder="Qty" value="${qty}" min="1" oninput="recalcTotal()" required>
