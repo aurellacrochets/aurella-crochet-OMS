@@ -798,6 +798,15 @@ h3 { font-size: 16px; font-weight: 600; }
       <option value="Pickup">Pickup</option>
       <option value="Shipping">Shipping</option>
     </select>
+    <select id="filter-sort" onchange="activeSortOrder=this.value;renderOrdersTable()">
+      <option value="newest">Newest First</option>
+      <option value="oldest">Oldest First</option>
+      <option value="price-high">Price: High → Low</option>
+      <option value="price-low">Price: Low → High</option>
+    </select>
+    <input type="date" id="filter-date-from" onchange="renderOrdersTable()" title="From date" style="max-width:145px">
+    <input type="date" id="filter-date-to" onchange="renderOrdersTable()" title="To date" style="max-width:145px">
+    <button class="btn btn-secondary btn-sm" onclick="clearDateRange()">✕ Date</button>
     <button class="btn btn-secondary btn-sm" onclick="exportCSV()">↓ Export CSV</button>
   </div>
   <div class="table-wrap">
@@ -1160,6 +1169,7 @@ let allItems  = [];
 let allProducts = [];
 let currentOrder = null;
 let activeStatusFilter = '';
+let activeSortOrder = 'newest';
 let pendingBcData = null;
 let pendingBeData = null;
 let productNames  = [];
@@ -1390,7 +1400,18 @@ function renderOrdersTable() {
       if (!h.includes(q)) return false;
     }
     return true;
-  }).sort((a,b)=>new Date(b.UpdatedAt||b.CreatedAt)-new Date(a.UpdatedAt||a.CreatedAt));
+  }).filter(o => {
+    const from = document.getElementById('filter-date-from').value;
+    const to   = document.getElementById('filter-date-to').value;
+    if (from && new Date(o.CreatedAt) < new Date(from)) return false;
+    if (to   && new Date(o.CreatedAt) > new Date(to + 'T23:59:59')) return false;
+    return true;
+  }).sort((a,b) => {
+    if (activeSortOrder === 'oldest')     return new Date(a.CreatedAt) - new Date(b.CreatedAt);
+    if (activeSortOrder === 'price-high') return orderAmount(b.OrderID) - orderAmount(a.OrderID);
+    if (activeSortOrder === 'price-low')  return orderAmount(a.OrderID) - orderAmount(b.OrderID);
+    return new Date(b.CreatedAt) - new Date(a.CreatedAt);
+  });
 
   document.getElementById('orders-table-body').innerHTML = filtered.map(o => {
     const amt = orderAmount(o.OrderID);
@@ -1411,6 +1432,12 @@ function renderOrdersTable() {
   }).join('') || `<tr><td colspan="10" class="table-empty">No orders match your filters</td></tr>`;
 
   document.getElementById('orders-count').textContent = `Showing ${filtered.length} of ${allOrders.length} orders`;
+}
+
+function clearDateRange() {
+  document.getElementById('filter-date-from').value = '';
+  document.getElementById('filter-date-to').value = '';
+  renderOrdersTable();
 }
 
 function buildCourierCell(o) {
@@ -2217,6 +2244,7 @@ function navigate(page) {
   if (page==='neworder') initNewOrderPage();
   if (page==='deleteorders') renderDeleteList();
   if (page==='products') renderProductsTable();
+  localStorage.setItem('aurella_last_page', page);
   window.scrollTo(0,0); closeSidebar();
 }
 document.querySelectorAll('.nav-item').forEach(item=>{
@@ -2330,12 +2358,13 @@ function toast(msg, type='info') {
 // ═══════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', ()=>{
   if (API_URL && AUTH_TOKEN) {
-    // We have a stored token — try to use it; server will reject if expired
     hideLoginScreen();
-    loadData();
+    loadData().then(()=>{
+      const lastPage = localStorage.getItem('aurella_last_page');
+      if (lastPage && document.getElementById(`page-${lastPage}`)) navigate(lastPage);
+    });
   } else if (!API_URL) {
     // No API at all — offer demo mode via the login screen
-    // (login screen is already visible by default)
   }
   // Otherwise login screen stays visible until the user signs in
 });
