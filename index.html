@@ -2367,6 +2367,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
       const lastPage = localStorage.getItem('aurella_last_page');
       if (lastPage && document.getElementById(`page-${lastPage}`)) navigate(lastPage);
     });
+    setInterval(()=>loadData(), 5000);
   } else if (!API_URL) {
     // No API at all — offer demo mode via the login screen
   }
