@@ -621,7 +621,7 @@ h3 { font-size: 16px; font-weight: 600; }
       <div class="login-left-tagline">
         <h1>Aurella Crochet</h1>
         <div class="login-left-divider"></div>
-        <p>Order Management</p>
+        <p>Order Management System</p>
       </div>
       <p class="login-left-quote"></p>
     </div>
@@ -802,8 +802,8 @@ h3 { font-size: 16px; font-weight: 600; }
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Order ID</th><th>Customer</th><th>Phone</th><th>Products</th><th>Amount</th><th>Payment</th><th>Status</th><th>Courier / AWB</th><th>Updated</th></tr></thead>
-      <tbody id="orders-table-body"><tr><td colspan="9" class="table-empty">Loading…</td></tr></tbody>
+      <thead><tr><th>Order ID</th><th>Customer</th><th>Phone</th><th>Products</th><th>Amount</th><th>Payment</th><th>Status</th><th>Courier / AWB</th><th>Order Date</th><th>Updated</th></tr></thead>
+      <tbody id="orders-table-body"><tr><td colspan="10" class="table-empty">Loading…</td></tr></tbody>
     </table>
   </div>
   <div id="orders-count" style="margin-top:10px;color:var(--muted);font-size:12px;"></div>
@@ -1152,7 +1152,7 @@ function numericKeydown(e) {
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
-let API_URL = localStorage.getItem('aurella_api') || 'https://script.google.com/macros/s/AKfycby5ZbtjftgDWVpYvkqAqGXsS6UijG1uyJ3lB0G4hmb2LSJXAnkjJ9Vsp4--KrzqkBodTw/exec';
+let API_URL = localStorage.getItem('aurella_api') || 'https://script.google.com/macros/s/AKfycbxPeK8ypVd0dSrOvaEGvC8KKQucM4ydsFjsDH4GWXfw4Qk-bywtAUR3fxcQnFNMeOtPVg/exec';
 let AUTH_TOKEN = localStorage.getItem('aurella_token') || '';
 let AUTH_USER = localStorage.getItem('aurella_user') || '';
 let allOrders = [];
@@ -1405,9 +1405,10 @@ function renderOrdersTable() {
       <td>${payBadge(o.PaymentStatus)}</td>
       <td>${statusBadge(o.OrderStatus)}</td>
       <td class="courier-cell" onclick="event.stopPropagation()">${courierCell}</td>
+      <td style="color:var(--muted);font-size:12px">${fmtDate(o.CreatedAt)}</td>
       <td style="color:var(--muted);font-size:12px">${fmtDate(o.UpdatedAt||o.CreatedAt)}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="9" class="table-empty">No orders match your filters</td></tr>`;
+  }).join('') || `<tr><td colspan="10" class="table-empty">No orders match your filters</td></tr>`;
 
   document.getElementById('orders-count').textContent = `Showing ${filtered.length} of ${allOrders.length} orders`;
 }
