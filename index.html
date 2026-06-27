@@ -2563,8 +2563,10 @@ async function toggleProductStatus(sku, newStatus) {
     const p = allProducts.find(x => x.SKU === sku);
     if (p) p.Status = newStatus;
     renderProductsTable();
+    hideLoading();
     toast(`${sku} set to ${newStatus}`, 'success');
   } catch(e) {
+    hideLoading();
     toast(e.message || 'Failed to update product', 'error');
   }
 }
