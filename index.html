@@ -769,7 +769,7 @@ h3 { font-size: 16px; font-weight: 600; }
   </div>
   <div class="section">
     <div class="section-title">Recent Orders <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--muted)">Last 10</span></div>
-    <div class="table-wrap">
+        <div class="table-wrap">
       <table>
         <thead><tr><th>Order ID</th><th>Customer</th><th>Status</th><th>Payment</th><th>Updated</th></tr></thead>
         <tbody id="recent-orders-body"><tr><td colspan="5" class="table-empty">Loading…</td></tr></tbody>
@@ -1055,7 +1055,13 @@ h3 { font-size: 16px; font-weight: 600; }
 
   <!-- Add Product Form -->
   <div class="form-section" style="margin-bottom:24px">
-    <div class="form-section-title">Add New Product</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="form-section-title" style="margin-bottom:0">Add New Product</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="openBulkAddModal()">↑ Bulk Add</button>
+        <button class="btn btn-secondary btn-sm" onclick="openBulkEditModal()">↑ Bulk Edit</button>
+      </div>
+    </div>
     <div class="form-grid three">
       <div class="form-group">
         <label class="form-label">SKU <span class="req">*</span></label>
@@ -1091,21 +1097,35 @@ h3 { font-size: 16px; font-weight: 600; }
   </div>
 
   <!-- Products Table -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <div class="search-wrap" style="flex:1;min-width:200px;position:relative">
+      <span class="search-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span>
+      <input type="text" id="products-search" placeholder="Search products…" oninput="productSearchQ=this.value.toLowerCase();toggleSearchClear('products-search','products-search-clear');renderProductsTable()">
+      <button class="search-clear" id="products-search-clear" onclick="productSearchQ='';clearSearch('products-search','products-search-clear',renderProductsTable)">✕</button>
+    </div>
+    <button class="btn btn-secondary btn-sm" id="product-multi-toggle-btn" onclick="toggleProductMultiMode()">☑ Select Multiple</button>
+  </div>
+  <div id="product-multi-bar" style="display:none;align-items:center;gap:10px;margin-bottom:12px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+    <span id="product-multi-count" style="color:var(--muted);font-size:13px">None selected</span>
+    <button class="btn btn-danger btn-sm" onclick="confirmMultiDeleteProducts()">🗑 Delete Selected</button>
+    <button class="btn btn-secondary btn-sm" onclick="selectedProducts.clear();renderProductsTable()">✕ Deselect All</button>
+  </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
+          <th></th>
           <th>SKU</th>
           <th>Product Name</th>
           <th>Category</th>
           <th>Color</th>
           <th>Price</th>
           <th>Status</th>
-          <th style="width:80px"></th>
+          <th style="width:120px"></th>
         </tr>
       </thead>
       <tbody id="products-table-body">
-        <tr><td colspan="7" class="table-empty">Loading…</td></tr>
+        <tr><td colspan="8" class="table-empty">Loading…</td></tr>
       </tbody>
     </table>
   </div>
@@ -1184,7 +1204,7 @@ function numericKeydown(e) {
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
-let API_URL = localStorage.getItem('aurella_api') || 'https://script.google.com/macros/s/AKfycbx8BpZfUPxwlkAtHv8MvtwpMy52WGDy_r6z3muCtYfd6sExDgDhH-atiISzr6yuPzeAVg/exec';
+let API_URL = localStorage.getItem('aurella_api') || 'https://script.google.com/macros/s/AKfycbw4ZrHDn93K819PkkkTliDegVEia28itbFyvcqzcOr70gfzLLJCj5z1_Cpx6Uz65Vn6_g/exec';
 let AUTH_TOKEN = localStorage.getItem('aurella_token') || '';
 let AUTH_USER = localStorage.getItem('aurella_user') || '';
 let allOrders = [];
@@ -2382,17 +2402,30 @@ function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 // ═══════════════════════════════════════════════════════════
 // PRODUCTS PAGE
 // ═══════════════════════════════════════════════════════════
+let selectedProducts = new Set();
+let productMultiMode = false;
+let productSearchQ = '';
+
 function renderProductsTable() {
   const tbody = document.getElementById('products-table-body');
   if (!tbody) return;
-  if (!allProducts.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">No products yet — add one above</td></tr>`;
+  const filtered = allProducts.filter(p => {
+    if (!productSearchQ) return true;
+    return `${p.SKU} ${p.ProductName||p['Product Name']||''} ${p.Category||''} ${p.Color||''}`.toLowerCase().includes(productSearchQ);
+  });
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="table-empty">No products found</td></tr>`;
+    updateProductMultiBar();
     return;
   }
-  tbody.innerHTML = allProducts.map(p => `
-    <tr>
+  tbody.innerHTML = filtered.map(p => {
+    const name = esc(p.ProductName || p['Product Name'] || '—');
+    const checked = selectedProducts.has(p.SKU) ? 'checked' : '';
+    const checkVisible = productMultiMode ? '' : 'style="display:none"';
+    return `<tr>
+      <td><input type="checkbox" class="delete-item-check" ${checked} ${checkVisible} onchange="toggleProductSelect('${esc(p.SKU)}',this.checked)"></td>
       <td style="font-family:monospace;font-size:12px;color:var(--accent2)">${esc(p.SKU)}</td>
-      <td>${esc(p.ProductName || p['Product Name'] || '—')}</td>
+      <td>${name}</td>
       <td style="color:var(--muted)">${esc(p.Category||'—')}</td>
       <td style="color:var(--muted)">${esc(p.Color||'—')}</td>
       <td class="amount-cell">${fmtAmount(parseFloat(p.Price)||0)}</td>
@@ -2404,8 +2437,63 @@ function renderProductsTable() {
         <button class="btn btn-secondary btn-sm" onclick="toggleProductStatus('${esc(p.SKU)}','${p.Status==='Active'?'Inactive':'Active'}')">
           ${p.Status==='Active' ? 'Deactivate' : 'Activate'}
         </button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProduct('${esc(p.SKU)}')">✕</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+  updateProductMultiBar();
+}
+
+function toggleProductSelect(sku, checked) {
+  if (checked) selectedProducts.add(sku);
+  else selectedProducts.delete(sku);
+  updateProductMultiBar();
+}
+
+function updateProductMultiBar() {
+  const bar = document.getElementById('product-multi-bar');
+  const count = document.getElementById('product-multi-count');
+  if (!bar) return;
+  if (productMultiMode) {
+    bar.style.display = 'flex';
+    count.textContent = selectedProducts.size > 0 ? `${selectedProducts.size} selected` : 'None selected';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function toggleProductMultiMode() {
+  productMultiMode = !productMultiMode;
+  if (!productMultiMode) selectedProducts.clear();
+  const btn = document.getElementById('product-multi-toggle-btn');
+  if (btn) btn.textContent = productMultiMode ? '✕ Cancel Selection' : '☑ Select Multiple';
+  renderProductsTable();
+}
+
+async function deleteProduct(sku) {
+  if (!confirm(`Delete product ${sku} permanently?`)) return;
+  try {
+    await apiPost('deleteProduct', { sku });
+    allProducts = allProducts.filter(p => p.SKU !== sku);
+    renderProductsTable();
+    toast(`${sku} deleted`, 'success');
+  } catch(e) { toast(e.message || 'Delete failed', 'error'); }
+}
+
+async function confirmMultiDeleteProducts() {
+  if (!selectedProducts.size) return;
+  const ids = [...selectedProducts];
+  if (!confirm(`Delete ${ids.length} product(s) permanently?`)) return;
+  for (const sku of ids) {
+    try {
+      await apiPost('deleteProduct', { sku });
+      allProducts = allProducts.filter(p => p.SKU !== sku);
+    } catch(e) { toast(`Failed: ${sku}`, 'error'); }
+  }
+  selectedProducts.clear();
+  productMultiMode = false;
+  renderProductsTable();
+  toast(`${ids.length} product(s) deleted`, 'success');
 }
 
 async function submitAddProduct() {
@@ -2482,7 +2570,8 @@ window.addEventListener('DOMContentLoaded', ()=>{
   function openEditProduct(sku) {
   const p = allProducts.find(x => x.SKU === sku);
   if (!p) return;
-  document.getElementById('ep-sku').value      = p.SKU;
+  document.getElementById('ep-sku').value          = p.SKU;
+  document.getElementById('ep-sku-original').value = p.SKU;
   document.getElementById('ep-name').value     = p.ProductName || p['Product Name'] || '';
   document.getElementById('ep-category').value = p.Category || '';
   document.getElementById('ep-color').value    = p.Color || '';
@@ -2496,8 +2585,9 @@ function closeEditProduct() {
 }
 
 async function saveEditProduct() {
-  const sku      = document.getElementById('ep-sku').value;
-  const name     = document.getElementById('ep-name').value.trim();
+  const sku         = document.getElementById('ep-sku').value.trim().toUpperCase();
+  const originalSku = document.getElementById('ep-sku-original').value;
+  const name        = document.getElementById('ep-name').value.trim();
   const category = document.getElementById('ep-category').value.trim();
   const color    = document.getElementById('ep-color').value.trim();
   const price    = parseFloat(document.getElementById('ep-price').value);
@@ -2507,11 +2597,12 @@ async function saveEditProduct() {
 
   try {
     await apiPost('updateProduct', {
-      sku,
-      fields: { ProductName: name, Category: category, Color: color, Price: price, Status: status }
+      sku: originalSku,
+      newSku: sku,
+      fields: { SKU: sku, ProductName: name, 'Product Name': name, Category: category, Color: color, Price: price, Status: status }
     });
-    const p = allProducts.find(x => x.SKU === sku);
-    if (p) { p.ProductName = name; p.Category = category; p.Color = color; p.Price = price; p.Status = status; }
+    const p = allProducts.find(x => x.SKU === originalSku);
+    if (p) { p.SKU = sku; p.ProductName = name; p.Category = category; p.Color = color; p.Price = price; p.Status = status; }
     renderProductsTable();
     closeEditProduct();
     toast(`${sku} updated`, 'success');
@@ -2519,6 +2610,115 @@ async function saveEditProduct() {
     toast(e.message || 'Failed to update product', 'error');
   }
 }
+
+// ── BULK ADD ────────────────────────────────────────────────
+function openBulkAddModal() { document.getElementById('bulk-add-modal').classList.add('open'); }
+function closeBulkAddModal() { document.getElementById('bulk-add-modal').classList.remove('open'); document.getElementById('bulk-add-preview').innerHTML=''; document.getElementById('bulk-add-file').value=''; }
+
+function downloadBulkAddTemplate() {
+  const csv = 'SKU,Product Name,Category,Color,Price,Status\nBA-CB-PK,Chunky Bag,Bags,Pink,1200,Active\n';
+  const a = document.createElement('a');
+  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+  a.download = 'bulk_add_template.csv';
+  a.click();
+}
+
+let bulkAddRows = [];
+function previewBulkAdd(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.trim().split('\n');
+    const headers = lines[0].split(',').map(h=>h.trim());
+    bulkAddRows = lines.slice(1).map(l => {
+      const vals = l.split(',').map(v=>v.trim());
+      const obj = {};
+      headers.forEach((h,i) => obj[h] = vals[i]||'');
+      return obj;
+    }).filter(r => r.SKU && r['Product Name'] && r.Price);
+    document.getElementById('bulk-add-preview').innerHTML = `<span style="color:var(--green)">${bulkAddRows.length} valid product(s) ready to add</span>`;
+  };
+  reader.readAsText(file);
+}
+
+async function submitBulkAdd() {
+  if (!bulkAddRows.length) { toast('No valid rows to upload', 'error'); return; }
+  let success = 0;
+  for (const row of bulkAddRows) {
+    try {
+      await apiPost('addProduct', {
+        sku: row.SKU.toUpperCase(),
+        productName: row['Product Name'],
+        category: row.Category||'',
+        color: row.Color||'',
+        price: parseFloat(row.Price)||0,
+        status: row.Status||'Inactive'
+      });
+      allProducts.push({ SKU: row.SKU.toUpperCase(), ProductName: row['Product Name'], Category: row.Category||'', Color: row.Color||'', Price: row.Price, Status: row.Status||'Inactive' });
+      success++;
+    } catch(e) { toast(`Failed: ${row.SKU}`, 'error'); }
+  }
+  renderProductsTable();
+  closeBulkAddModal();
+  toast(`${success} product(s) added`, 'success');
+}
+
+// ── BULK EDIT ────────────────────────────────────────────────
+function openBulkEditModal() { document.getElementById('bulk-edit-modal').classList.add('open'); }
+function closeBulkEditModal() { document.getElementById('bulk-edit-modal').classList.remove('open'); document.getElementById('bulk-edit-preview').innerHTML=''; document.getElementById('bulk-edit-file').value=''; }
+
+function downloadBulkEditTemplate() {
+  const skus = allProducts.map(p=>`${p.SKU},,,,,""`).join('\n');
+  const csv = 'SKU,Product Name,Category,Color,Price,Status\n' + skus + '\n';
+  const a = document.createElement('a');
+  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+  a.download = 'bulk_edit_template.csv';
+  a.click();
+}
+
+let bulkEditRows = [];
+function previewBulkEdit(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.trim().split('\n');
+    const headers = lines[0].split(',').map(h=>h.trim());
+    bulkEditRows = lines.slice(1).map(l => {
+      const vals = l.split(',').map(v=>v.trim());
+      const obj = {};
+      headers.forEach((h,i) => obj[h] = vals[i]||'');
+      return obj;
+    }).filter(r => r.SKU);
+    document.getElementById('bulk-edit-preview').innerHTML = `<span style="color:var(--green)">${bulkEditRows.length} product(s) to update</span>`;
+  };
+  reader.readAsText(file);
+}
+
+async function submitBulkEdit() {
+  if (!bulkEditRows.length) { toast('No valid rows', 'error'); return; }
+  let success = 0;
+  for (const row of bulkEditRows) {
+    const fields = {};
+    if (row['Product Name']) { fields.ProductName = row['Product Name']; fields['Product Name'] = row['Product Name']; }
+    if (row.Category)        fields.Category = row.Category;
+    if (row.Color)           fields.Color = row.Color;
+    if (row.Price)           fields.Price = parseFloat(row.Price);
+    if (row.Status)          fields.Status = row.Status;
+    if (!Object.keys(fields).length) continue;
+    try {
+      await apiPost('updateProduct', { sku: row.SKU.toUpperCase(), fields });
+      const p = allProducts.find(x=>x.SKU===row.SKU.toUpperCase());
+      if (p) Object.assign(p, { ProductName: fields.ProductName||p.ProductName, Category: fields.Category||p.Category, Color: fields.Color||p.Color, Price: fields.Price||p.Price, Status: fields.Status||p.Status });
+      success++;
+    } catch(e) { toast(`Failed: ${row.SKU}`, 'error'); }
+  }
+  renderProductsTable();
+  closeBulkEditModal();
+  toast(`${success} product(s) updated`, 'success');
+}
+
 </script>
   <!-- EDIT PRODUCT MODAL -->
 <div class="modal-overlay" id="edit-product-modal">
@@ -2526,8 +2726,9 @@ async function saveEditProduct() {
     <h3 style="margin-bottom:20px">Edit Product</h3>
     <div class="form-grid">
       <div class="form-group">
-        <label class="form-label">SKU <span style="color:var(--muted);font-weight:400">(read-only)</span></label>
-        <input type="text" id="ep-sku" disabled style="opacity:.5">
+        <label class="form-label">SKU <span class="req">*</span></label>
+        <input type="text" id="ep-sku" style="text-transform:uppercase">
+        <input type="hidden" id="ep-sku-original">
       </div>
       <div class="form-group">
         <label class="form-label">Status</label>
@@ -2573,5 +2774,40 @@ async function saveEditProduct() {
     }
   });
 </script>
+<!-- BULK ADD PRODUCTS MODAL -->
+<div class="modal-overlay" id="bulk-add-modal">
+  <div class="modal" style="max-width:540px">
+    <h3 style="margin-bottom:8px">Bulk Add Products</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Upload a CSV with columns: SKU*, Product Name*, Category, Color, Price*, Status</p>
+    <button class="btn btn-secondary btn-sm" onclick="downloadBulkAddTemplate()" style="margin-bottom:16px">↓ Download Template</button>
+    <div class="form-group">
+      <label class="form-label">Upload CSV</label>
+      <input type="file" id="bulk-add-file" accept=".csv" onchange="previewBulkAdd(this)">
+    </div>
+    <div id="bulk-add-preview" style="margin-top:12px;font-size:13px;color:var(--muted)"></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="submitBulkAdd()">↑ Upload Products</button>
+      <button class="btn btn-secondary" onclick="closeBulkAddModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK EDIT PRODUCTS MODAL -->
+<div class="modal-overlay" id="bulk-edit-modal">
+  <div class="modal" style="max-width:540px">
+    <h3 style="margin-bottom:8px">Bulk Edit Products</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">SKU is required as identifier. Only fill columns you want to change.</p>
+    <button class="btn btn-secondary btn-sm" onclick="downloadBulkEditTemplate()" style="margin-bottom:16px">↓ Download Template</button>
+    <div class="form-group">
+      <label class="form-label">Upload CSV</label>
+      <input type="file" id="bulk-edit-file" accept=".csv" onchange="previewBulkEdit(this)">
+    </div>
+    <div id="bulk-edit-preview" style="margin-top:12px;font-size:13px;color:var(--muted)"></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="submitBulkEdit()">↑ Apply Changes</button>
+      <button class="btn btn-secondary" onclick="closeBulkEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
