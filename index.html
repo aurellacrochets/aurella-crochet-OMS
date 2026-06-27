@@ -2520,21 +2520,23 @@ async function confirmMultiDeleteProducts() {
   const ids = [...selectedProducts];
   if (!confirm(`Delete ${ids.length} product(s) permanently?`)) return;
   window._busyDeleting = true;
-  const bar = document.getElementById('product-multi-bar');
-  if (bar) bar.innerHTML = `<span style="color:var(--muted);font-size:13px">Deleting ${ids.length} product(s)…</span>`;
-  for (const sku of ids) {
+  let failed = 0;
+  for (let i = 0; i < ids.length; i++) {
+    showLoading(`Deleting ${i + 1} of ${ids.length} products…`);
     try {
-      await apiPost('deleteProduct', { sku });
-      allProducts = allProducts.filter(p => p.SKU !== sku);
-    } catch(e) { toast(`Failed: ${sku}`, 'error'); }
+      await apiPost('deleteProduct', { sku: ids[i] });
+      allProducts = allProducts.filter(p => p.SKU !== ids[i]);
+    } catch(e) { failed++; }
   }
   window._busyDeleting = false;
+  hideLoading();
   selectedProducts.clear();
   productMultiMode = false;
   const btn = document.getElementById('product-multi-toggle-btn');
   if (btn) btn.textContent = '☑ Select Multiple';
   renderProductsTable();
-  toast(`${ids.length} product(s) deleted`, 'success');
+  if (failed > 0) toast(`${ids.length - failed} deleted, ${failed} failed`, 'error');
+  else toast(`${ids.length} product(s) deleted`, 'success');
 }
 
 async function submitAddProduct() {
