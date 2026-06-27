@@ -2110,6 +2110,7 @@ async function confirmMultiDelete() {
   if (selectedToDelete.size === 0) return;
   const ids = [...selectedToDelete];
   if (!confirm(`Delete ${ids.length} order(s) permanently?`)) return;
+  window._busyDeleting = true;
   const bar = document.getElementById('multi-delete-bar');
   bar.innerHTML = `<span style="color:var(--muted);font-size:13px">Deleting ${ids.length} orders…</span>`;
   for (const orderId of ids) {
@@ -2119,6 +2120,7 @@ async function confirmMultiDelete() {
       allItems  = allItems.filter(i=>i.OrderID!==orderId);
     } catch(e) { toast(`Failed to delete ${orderId}`, 'error'); }
   }
+  window._busyDeleting = false;
   selectedToDelete.clear();
   renderDeleteList(); renderOverview(); renderOrdersTable();
   toast(`${ids.length} order(s) deleted`, 'success');
@@ -2517,6 +2519,7 @@ async function confirmMultiDeleteProducts() {
   if (!selectedProducts.size) return;
   const ids = [...selectedProducts];
   if (!confirm(`Delete ${ids.length} product(s) permanently?`)) return;
+  window._busyDeleting = true;
   const bar = document.getElementById('product-multi-bar');
   if (bar) bar.innerHTML = `<span style="color:var(--muted);font-size:13px">Deleting ${ids.length} product(s)…</span>`;
   for (const sku of ids) {
@@ -2525,6 +2528,7 @@ async function confirmMultiDeleteProducts() {
       allProducts = allProducts.filter(p => p.SKU !== sku);
     } catch(e) { toast(`Failed: ${sku}`, 'error'); }
   }
+  window._busyDeleting = false;
   selectedProducts.clear();
   productMultiMode = false;
   const btn = document.getElementById('product-multi-toggle-btn');
@@ -2591,7 +2595,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
       const lastPage = localStorage.getItem('aurella_last_page');
       if (lastPage && document.getElementById(`page-${lastPage}`)) navigate(lastPage);
     });
-    setInterval(()=>loadData(), 20000);
+    setInterval(()=>{ if (!window._busyDeleting) loadData(); }, 10000);
   } else if (!API_URL) {
     // No API at all — offer demo mode via the login screen
   }
@@ -2687,8 +2691,13 @@ function previewBulkAdd(input) {
 
 async function submitBulkAdd() {
   if (!bulkAddRows.length) { toast('No valid rows to upload', 'error'); return; }
+  window._busyDeleting = true;
   let success = 0;
-  for (const row of bulkAddRows) {
+  let failed = 0;
+  showLoading(`Uploading 0 of ${bulkAddRows.length} products…`);
+  for (let i = 0; i < bulkAddRows.length; i++) {
+    const row = bulkAddRows[i];
+    showLoading(`Uploading ${i + 1} of ${bulkAddRows.length} products…`);
     try {
       await apiPost('addProduct', {
         sku: row.SKU.toUpperCase(),
@@ -2700,11 +2709,14 @@ async function submitBulkAdd() {
       });
       allProducts.push({ SKU: row.SKU.toUpperCase(), ProductName: row['Product Name'], Category: row.Category||'', Color: row.Color||'', Price: row.Price, Status: row.Status||'Inactive' });
       success++;
-    } catch(e) { toast(`Failed: ${row.SKU}`, 'error'); }
+    } catch(e) { failed++; }
   }
+  window._busyDeleting = false;
+  hideLoading();
   renderProductsTable();
   closeBulkAddModal();
-  toast(`${success} product(s) added`, 'success');
+  if (failed > 0) toast(`${success} added, ${failed} failed (duplicate SKUs?)`, 'error');
+  else toast(`${success} product(s) added`, 'success');
 }
 
 // ── BULK EDIT ────────────────────────────────────────────────
