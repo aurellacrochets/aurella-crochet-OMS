@@ -619,10 +619,22 @@ h3 { font-size: 16px; font-weight: 600; }
 .multi-delete-bar { display: none; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .multi-delete-bar.visible { display: flex; }
   
+  /* ─── LOADING OVERLAY ────────────────────────────────────── */
+#loading-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; align-items:center; justify-content:center; flex-direction:column; gap:12px; }
+#loading-overlay.visible { display:flex; }
+.loading-spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+.loading-label { color:#fff; font-size:14px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body>
+
+<div id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-label" id="loading-label">Saving…</div>
+</div>
 
 <!-- LOGIN SCREEN -->
 <div id="login-screen" class="visible">
@@ -1107,6 +1119,7 @@ h3 { font-size: 16px; font-weight: 600; }
   </div>
   <div id="product-multi-bar" style="display:none;align-items:center;gap:10px;margin-bottom:12px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm)">
     <span id="product-multi-count" style="color:var(--muted);font-size:13px">None selected</span>
+    <button class="btn btn-secondary btn-sm" onclick="selectAllProducts()">✓ Select All</button>
     <button class="btn btn-danger btn-sm" onclick="confirmMultiDeleteProducts()">🗑 Delete Selected</button>
     <button class="btn btn-secondary btn-sm" onclick="selectedProducts.clear();renderProductsTable()">✕ Deselect All</button>
   </div>
@@ -1385,6 +1398,14 @@ function setApiStatus(s) {
   else if (s==='err'){ dot.className='dot red';    lbl.textContent='No API'; }
   else               { dot.className='dot yellow'; lbl.textContent='Connecting…'; }
 }
+
+function showLoading(msg='Saving…') {
+  document.getElementById('loading-label').textContent = msg;
+  document.getElementById('loading-overlay').classList.add('visible');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('visible');
+}   
 
 // ═══════════════════════════════════════════════════════════
 // ORDER AMOUNT HELPER
@@ -2126,12 +2147,15 @@ async function confirmDelete() {
   btn.disabled=true; btn.textContent='Deleting…';
 
   try {
+    showLoading('Deleting order…');
     await apiPost('deleteOrder', { orderId: orderToDelete });
   } catch(e) {
+    hideLoading();
     toast(e.message || 'Delete failed', 'error');
     btn.disabled=false; btn.textContent='Delete Permanently';
     return;
   }
+  hideLoading();
 
   allOrders = allOrders.filter(o=>o.OrderID!==orderToDelete);
   allItems  = allItems.filter(i=>i.OrderID!==orderToDelete);
@@ -2480,10 +2504,21 @@ async function deleteProduct(sku) {
   } catch(e) { toast(e.message || 'Delete failed', 'error'); }
 }
 
+function selectAllProducts() {
+  const filtered = allProducts.filter(p => {
+    if (!productSearchQ) return true;
+    return `${p.SKU} ${p.ProductName||p['Product Name']||''} ${p.Category||''} ${p.Color||''}`.toLowerCase().includes(productSearchQ);
+  });
+  filtered.forEach(p => selectedProducts.add(p.SKU));
+  renderProductsTable();
+}
+
 async function confirmMultiDeleteProducts() {
   if (!selectedProducts.size) return;
   const ids = [...selectedProducts];
   if (!confirm(`Delete ${ids.length} product(s) permanently?`)) return;
+  const bar = document.getElementById('product-multi-bar');
+  if (bar) bar.innerHTML = `<span style="color:var(--muted);font-size:13px">Deleting ${ids.length} product(s)…</span>`;
   for (const sku of ids) {
     try {
       await apiPost('deleteProduct', { sku });
@@ -2492,6 +2527,8 @@ async function confirmMultiDeleteProducts() {
   }
   selectedProducts.clear();
   productMultiMode = false;
+  const btn = document.getElementById('product-multi-toggle-btn');
+  if (btn) btn.textContent = '☑ Select Multiple';
   renderProductsTable();
   toast(`${ids.length} product(s) deleted`, 'success');
 }
@@ -2521,6 +2558,7 @@ async function submitAddProduct() {
 
 async function toggleProductStatus(sku, newStatus) {
   try {
+    showLoading('Saving product…');
     await apiPost('updateProduct', { sku, fields: { Status: newStatus } });
     const p = allProducts.find(x => x.SKU === sku);
     if (p) p.Status = newStatus;
@@ -2596,6 +2634,7 @@ async function saveEditProduct() {
   if (!name || isNaN(price)) { toast('Product Name and Price are required', 'error'); return; }
 
   try {
+    showLoading('Saving product…');
     await apiPost('updateProduct', {
       sku: originalSku,
       newSku: sku,
@@ -2604,10 +2643,12 @@ async function saveEditProduct() {
     const p = allProducts.find(x => x.SKU === originalSku);
     if (p) { p.SKU = sku; p.ProductName = name; p.Category = category; p.Color = color; p.Price = price; p.Status = status; }
     renderProductsTable();
-    closeEditProduct();
-    toast(`${sku} updated`, 'success');
+    closeEditProductModal();
+    hideLoading();
+    toast('Product updated', 'success');
   } catch(e) {
-    toast(e.message || 'Failed to update product', 'error');
+    hideLoading();
+    toast(e.message||'Update failed','error');
   }
 }
 
