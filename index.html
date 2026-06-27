@@ -1193,6 +1193,18 @@ h3 { font-size: 16px; font-weight: 600; }
 // ═══════════════════════════════════════════════════════════
 // HELPERS — input guards
 // ═══════════════════════════════════════════════════════════
+
+function downloadResultsCSV(rows, headers, filename) {
+  const lines = [headers.join(',')];
+  rows.forEach(r => {
+    lines.push(headers.map(h => `"${(r[h]||'').toString().replace(/"/g,'""')}"`).join(','));
+  });
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines.join('\n'));
+  a.download = filename;
+  a.click();
+}
+
 function digitsOnly(input, maxLen) {
   // Remove any non-digit character as the user types
   const pos = input.selectionStart;
@@ -2228,15 +2240,36 @@ function renderBulkCreatePreview(newOrders, skipped) {
 
 async function applyBulkCreate() {
   if (!pendingBcData?.newOrders.length) { toast('Nothing to create','error'); return; }
-  const btn = event.target; btn.disabled=true; btn.textContent='Creating…';
-  for (const o of pendingBcData.newOrders) {
+  const btn = event.target; btn.disabled=true;
+  window._busyDeleting = true;
+  const results = [];
+  for (let i = 0; i < pendingBcData.newOrders.length; i++) {
+    const o = pendingBcData.newOrders[i];
+    showLoading(`Creating order ${i + 1} of ${pendingBcData.newOrders.length}…`);
     const order = { ...o, Email:'', CreatedAt:new Date().toISOString(), UpdatedAt:new Date().toISOString() };
-    try { await apiPost('createOrder', { order, products:o.products }); } catch(e) {}
-    allOrders.push(order);
-    o.products.forEach(p=>allItems.push({ OrderID:o.OrderID, ...p }));
+    try {
+      await apiPost('createOrder', { order, products:o.products });
+      allOrders.push(order);
+      o.products.forEach(p=>allItems.push({ OrderID:o.OrderID, ...p }));
+      results.push({ 'Order ID': o.OrderID, 'Customer Name': o.CustomerName, 'Status': 'Upload Successful' });
+    } catch(e) {
+      results.push({ 'Order ID': o.OrderID, 'Customer Name': o.CustomerName, 'Status': e.message || 'Upload Failed' });
+    }
   }
+  // add skipped orders to results too
+  pendingBcData.skipped.forEach(id => {
+    results.push({ 'Order ID': id, 'Customer Name': '', 'Status': 'Order ID already exists' });
+  });
+  window._busyDeleting = false;
+  hideLoading();
   renderOverview(); renderOrdersTable(); renderDeleteList();
-  toast(`Created ${pendingBcData.newOrders.length} orders`, 'success');
+  const failed = results.filter(r => r.Status !== 'Upload Successful').length;
+  if (failed > 0) {
+    toast(`${results.length - failed} created, ${failed} failed — downloading report`, 'error');
+    downloadResultsCSV(results, ['Order ID','Customer Name','Status'], 'bulk_create_report.csv');
+  } else {
+    toast(`Created ${pendingBcData.newOrders.length} orders`, 'success');
+  }
   clearCSV('bc');
   btn.disabled=false; btn.textContent='✓ Apply & Create Orders';
 }
@@ -2289,14 +2322,33 @@ function renderBulkEditPreview(updated, notFound, noChange) {
 
 async function applyBulkEdit() {
   if (!pendingBeData?.updated.length) { toast('Nothing to update','error'); return; }
-  const btn = event.target; btn.disabled=true; btn.textContent='Updating…';
-  for (const {id, changes} of pendingBeData.updated) {
-    try { await apiPost('updateOrder', { orderId:id, fields:changes }); } catch(e) {}
-    const idx = allOrders.findIndex(o=>o.OrderID===id);
-    if (idx>=0) allOrders[idx] = { ...allOrders[idx], ...changes, UpdatedAt:new Date().toISOString() };
+  const btn = event.target; btn.disabled=true;
+  window._busyDeleting = true;
+  const results = [];
+  for (let i = 0; i < pendingBeData.updated.length; i++) {
+    const {id, changes} = pendingBeData.updated[i];
+    showLoading(`Updating order ${i + 1} of ${pendingBeData.updated.length}…`);
+    try {
+      await apiPost('updateOrder', { orderId:id, fields:changes });
+      const idx = allOrders.findIndex(o=>o.OrderID===id);
+      if (idx>=0) allOrders[idx] = { ...allOrders[idx], ...changes, UpdatedAt:new Date().toISOString() };
+      results.push({ 'Order ID': id, 'Status': 'Upload Successful' });
+    } catch(e) {
+      results.push({ 'Order ID': id, 'Status': e.message || 'Update Failed' });
+    }
   }
+  pendingBeData.notFound.forEach(id => results.push({ 'Order ID': id, 'Status': 'Order ID not found' }));
+  pendingBeData.noChange.forEach(id => results.push({ 'Order ID': id, 'Status': 'No changes provided' }));
+  window._busyDeleting = false;
+  hideLoading();
   renderOverview(); renderOrdersTable();
-  toast(`Updated ${pendingBeData.updated.length} orders`, 'success');
+  const failed = results.filter(r => r.Status !== 'Upload Successful').length;
+  if (failed > 0) {
+    toast(`${results.length - failed} updated, ${failed} had issues — downloading report`, 'error');
+    downloadResultsCSV(results, ['Order ID','Status'], 'bulk_edit_report.csv');
+  } else {
+    toast(`Updated ${pendingBeData.updated.length} orders`, 'success');
+  }
   clearCSV('be');
   btn.disabled=false; btn.textContent='✓ Apply Updates';
 }
@@ -2694,9 +2746,7 @@ function previewBulkAdd(input) {
 async function submitBulkAdd() {
   if (!bulkAddRows.length) { toast('No valid rows to upload', 'error'); return; }
   window._busyDeleting = true;
-  let success = 0;
-  let failed = 0;
-  showLoading(`Uploading 0 of ${bulkAddRows.length} products…`);
+  const results = [];
   for (let i = 0; i < bulkAddRows.length; i++) {
     const row = bulkAddRows[i];
     showLoading(`Uploading ${i + 1} of ${bulkAddRows.length} products…`);
@@ -2710,15 +2760,22 @@ async function submitBulkAdd() {
         status: row.Status||'Inactive'
       });
       allProducts.push({ SKU: row.SKU.toUpperCase(), ProductName: row['Product Name'], Category: row.Category||'', Color: row.Color||'', Price: row.Price, Status: row.Status||'Inactive' });
-      success++;
-    } catch(e) { failed++; }
+      results.push({ SKU: row.SKU.toUpperCase(), 'Product Name': row['Product Name'], Status: 'Upload Successful' });
+    } catch(e) {
+      results.push({ SKU: row.SKU.toUpperCase(), 'Product Name': row['Product Name'], Status: e.message || 'Upload Failed' });
+    }
   }
   window._busyDeleting = false;
   hideLoading();
   renderProductsTable();
   closeBulkAddModal();
-  if (failed > 0) toast(`${success} added, ${failed} failed (duplicate SKUs?)`, 'error');
-  else toast(`${success} product(s) added`, 'success');
+  const failed = results.filter(r => r.Status !== 'Upload Successful').length;
+  if (failed > 0) {
+    toast(`${results.length - failed} added, ${failed} failed — downloading report`, 'error');
+    downloadResultsCSV(results, ['SKU','Product Name','Status'], 'bulk_add_products_report.csv');
+  } else {
+    toast(`${results.length} product(s) added`, 'success');
+  }
 }
 
 // ── BULK EDIT ────────────────────────────────────────────────
@@ -2755,8 +2812,42 @@ function previewBulkEdit(input) {
 
 async function submitBulkEdit() {
   if (!bulkEditRows.length) { toast('No valid rows', 'error'); return; }
-  let success = 0;
-  for (const row of bulkEditRows) {
+  window._busyDeleting = true;
+  const results = [];
+  for (let i = 0; i < bulkEditRows.length; i++) {
+    const row = bulkEditRows[i];
+    showLoading(`Updating ${i + 1} of ${bulkEditRows.length} products…`);
+    const fields = {};
+    if (row['Product Name']) { fields.ProductName = row['Product Name']; fields['Product Name'] = row['Product Name']; }
+    if (row.Category)        fields.Category = row.Category;
+    if (row.Color)           fields.Color = row.Color;
+    if (row.Price)           fields.Price = parseFloat(row.Price);
+    if (row.Status)          fields.Status = row.Status;
+    if (!Object.keys(fields).length) {
+      results.push({ SKU: row.SKU, Status: 'No changes provided' });
+      continue;
+    }
+    try {
+      await apiPost('updateProduct', { sku: row.SKU.toUpperCase(), fields });
+      const p = allProducts.find(x=>x.SKU===row.SKU.toUpperCase());
+      if (p) Object.assign(p, { ProductName: fields.ProductName||p.ProductName, Category: fields.Category||p.Category, Color: fields.Color||p.Color, Price: fields.Price||p.Price, Status: fields.Status||p.Status });
+      results.push({ SKU: row.SKU, Status: 'Upload Successful' });
+    } catch(e) {
+      results.push({ SKU: row.SKU, Status: e.message || 'Update Failed' });
+    }
+  }
+  window._busyDeleting = false;
+  hideLoading();
+  renderProductsTable();
+  closeBulkEditModal();
+  const failed = results.filter(r => r.Status !== 'Upload Successful').length;
+  if (failed > 0) {
+    toast(`${results.length - failed} updated, ${failed} failed — downloading report`, 'error');
+    downloadResultsCSV(results, ['SKU','Status'], 'bulk_edit_products_report.csv');
+  } else {
+    toast(`${results.length} product(s) updated`, 'success');
+  }
+}
     const fields = {};
     if (row['Product Name']) { fields.ProductName = row['Product Name']; fields['Product Name'] = row['Product Name']; }
     if (row.Category)        fields.Category = row.Category;
