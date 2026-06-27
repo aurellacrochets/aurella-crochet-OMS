@@ -2643,7 +2643,7 @@ async function saveEditProduct() {
     const p = allProducts.find(x => x.SKU === originalSku);
     if (p) { p.SKU = sku; p.ProductName = name; p.Category = category; p.Color = color; p.Price = price; p.Status = status; }
     renderProductsTable();
-    closeEditProductModal();
+    closeEditProduct();
     hideLoading();
     toast('Product updated', 'success');
   } catch(e) {
