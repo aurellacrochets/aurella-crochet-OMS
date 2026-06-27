@@ -608,6 +608,16 @@ h3 { font-size: 16px; font-weight: 600; }
   transition: all .15s;
 }
 .logout-btn:hover { color: var(--red); border-color: #7f2020; }
+
+/* ─── SEARCH CLEAR BTN ───────────────────────────────────── */
+.search-clear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0; display: none; line-height: 1; }
+.search-clear.visible { display: block; }
+.search-wrap, .delete-search-wrap { position: relative; }
+
+/* ─── MULTI DELETE ───────────────────────────────────────── */
+.delete-item-check { margin-right: 10px; width: 16px; height: 16px; cursor: pointer; accent-color: var(--red); }
+.multi-delete-bar { display: none; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.multi-delete-bar.visible { display: flex; }
   
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -787,7 +797,8 @@ h3 { font-size: 16px; font-weight: 600; }
   <div class="filter-row">
     <div class="search-wrap">
       <span class="search-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span>
-      <input type="text" id="orders-search" placeholder="Search by ID, name, phone, AWB, pincode…" oninput="renderOrdersTable()">
+      <input type="text" id="orders-search" placeholder="Search by ID, name, phone, AWB, pincode…" oninput="renderOrdersTable();toggleSearchClear('orders-search','orders-search-clear')">
+      <button class="search-clear" id="orders-search-clear" onclick="clearSearch('orders-search','orders-search-clear',renderOrdersTable)">✕</button>
     </div>
     <select id="filter-payment" onchange="renderOrdersTable()">
       <option value="">All Payments</option>
@@ -1009,8 +1020,13 @@ h3 { font-size: 16px; font-weight: 600; }
 <!-- ═══ DELETE ORDERS ═════════════════════════════════════════ -->
 <section class="page" id="page-deleteorders">
   <div class="page-header">
-    <h2 style="color:var(--red)">Delete Orders</h2>
-    <p>Permanently remove orders from the system</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <h2 style="color:var(--red)">Delete Orders</h2>
+        <p>Permanently remove orders from the system</p>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="toggleMultiDeleteMode()" id="multi-delete-toggle-btn">☑ Select Multiple</button>
+    </div>
   </div>
   <div class="danger-zone-notice">
     ⚠ Deletions are <strong>permanent and cannot be undone</strong>. Each deletion requires confirmation. Use with caution.
@@ -1019,7 +1035,13 @@ h3 { font-size: 16px; font-weight: 600; }
     <span class="search-icon" style="left:10px;top:50%;transform:translateY(-50%);position:absolute;color:var(--muted)">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
     </span>
-    <input type="text" id="delete-search" placeholder="Search orders to delete…" oninput="renderDeleteList()" style="padding-left:34px">
+    <input type="text" id="delete-search" placeholder="Search orders to delete…" oninput="renderDeleteList();toggleSearchClear('delete-search','delete-search-clear')" style="padding-left:34px">
+    <button class="search-clear" id="delete-search-clear" onclick="clearSearch('delete-search','delete-search-clear',renderDeleteList)">✕</button>
+  </div>
+  <div class="multi-delete-bar" id="multi-delete-bar">
+    <span id="multi-delete-count" style="color:var(--muted);font-size:13px">0 selected</span>
+    <button class="btn btn-danger btn-sm" onclick="confirmMultiDelete()">🗑 Delete Selected</button>
+    <button class="btn btn-secondary btn-sm" onclick="clearMultiSelect()">✕ Clear</button>
   </div>
   <div class="delete-list" id="delete-list"></div>
 </section>
@@ -1488,6 +1510,20 @@ function buildOrderProductsCell(orderId) {
       <div class="prod-dropdown-list" id="${uid}">${restHtml}</div>
     </div>
   </div>`;
+}
+
+function toggleSearchClear(inputId, btnId) {
+  const val = document.getElementById(inputId)?.value;
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.toggle('visible', val.length > 0);
+}
+
+function clearSearch(inputId, btnId, renderFn) {
+  const input = document.getElementById(inputId);
+  if (input) input.value = '';
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.remove('visible');
+  renderFn();
 }
 
 function toggleProdDropdown(uid) {
@@ -1965,6 +2001,9 @@ function selectAutoComplete(e, name, price) {
 // ═══════════════════════════════════════════════════════════
 // DELETE ORDERS
 // ═══════════════════════════════════════════════════════════
+let selectedToDelete = new Set();
+let multiDeleteMode = false;
+
 function renderDeleteList() {
   const q = (document.getElementById('delete-search')?.value||'').toLowerCase();
   let orders = allOrders.filter(o => {
@@ -1977,7 +2016,10 @@ function renderDeleteList() {
   list.innerHTML = orders.map(o => {
     const items = allItems.filter(i=>i.OrderID===o.OrderID);
     const amt = orderAmount(o.OrderID);
+    const checked = selectedToDelete.has(o.OrderID) ? 'checked' : '';
+    const checkVisible = multiDeleteMode ? '' : 'style="display:none"';
     return `<div class="delete-item">
+      <input type="checkbox" class="delete-item-check" ${checked} ${checkVisible} onchange="toggleDeleteSelect('${o.OrderID}', this.checked)">
       <div class="delete-item-info">
         <div class="delete-item-id">${o.OrderID}</div>
         <div class="delete-item-name">${esc(o.CustomerName)}</div>
@@ -1989,6 +2031,56 @@ function renderDeleteList() {
       </button>
     </div>`;
   }).join('') || `<div style="text-align:center;padding:48px;color:var(--muted)">No orders found</div>`;
+  updateMultiDeleteBar();
+}
+
+function toggleDeleteSelect(orderId, checked) {
+  if (checked) selectedToDelete.add(orderId);
+  else selectedToDelete.delete(orderId);
+  updateMultiDeleteBar();
+}
+
+function updateMultiDeleteBar() {
+  const bar = document.getElementById('multi-delete-bar');
+  const count = document.getElementById('multi-delete-count');
+  if (!bar) return;
+  if (multiDeleteMode) {
+    bar.style.display = 'flex';
+    count.textContent = selectedToDelete.size > 0 ? `${selectedToDelete.size} selected` : 'None selected';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function clearMultiSelect() {
+  selectedToDelete.clear();
+  renderDeleteList();
+}
+
+function toggleMultiDeleteMode() {
+  multiDeleteMode = !multiDeleteMode;
+  if (!multiDeleteMode) selectedToDelete.clear();
+  const btn = document.getElementById('multi-delete-toggle-btn');
+  if (btn) btn.textContent = multiDeleteMode ? '✕ Cancel Selection' : '☑ Select Multiple';
+  renderDeleteList();
+}
+
+async function confirmMultiDelete() {
+  if (selectedToDelete.size === 0) return;
+  const ids = [...selectedToDelete];
+  if (!confirm(`Delete ${ids.length} order(s) permanently?`)) return;
+  const bar = document.getElementById('multi-delete-bar');
+  bar.innerHTML = `<span style="color:var(--muted);font-size:13px">Deleting ${ids.length} orders…</span>`;
+  for (const orderId of ids) {
+    try {
+      await apiPost('deleteOrder', { orderId });
+      allOrders = allOrders.filter(o=>o.OrderID!==orderId);
+      allItems  = allItems.filter(i=>i.OrderID!==orderId);
+    } catch(e) { toast(`Failed to delete ${orderId}`, 'error'); }
+  }
+  selectedToDelete.clear();
+  renderDeleteList(); renderOverview(); renderOrdersTable();
+  toast(`${ids.length} order(s) deleted`, 'success');
 }
 
 function showDeleteModal(orderId) {
