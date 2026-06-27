@@ -2848,25 +2848,7 @@ async function submitBulkEdit() {
     toast(`${results.length} product(s) updated`, 'success');
   }
 }
-    const fields = {};
-    if (row['Product Name']) { fields.ProductName = row['Product Name']; fields['Product Name'] = row['Product Name']; }
-    if (row.Category)        fields.Category = row.Category;
-    if (row.Color)           fields.Color = row.Color;
-    if (row.Price)           fields.Price = parseFloat(row.Price);
-    if (row.Status)          fields.Status = row.Status;
-    if (!Object.keys(fields).length) continue;
-    try {
-      await apiPost('updateProduct', { sku: row.SKU.toUpperCase(), fields });
-      const p = allProducts.find(x=>x.SKU===row.SKU.toUpperCase());
-      if (p) Object.assign(p, { ProductName: fields.ProductName||p.ProductName, Category: fields.Category||p.Category, Color: fields.Color||p.Color, Price: fields.Price||p.Price, Status: fields.Status||p.Status });
-      success++;
-    } catch(e) { toast(`Failed: ${row.SKU}`, 'error'); }
-  }
-  renderProductsTable();
-  closeBulkEditModal();
-  toast(`${success} product(s) updated`, 'success');
-}
-
+    
 </script>
   <!-- EDIT PRODUCT MODAL -->
 <div class="modal-overlay" id="edit-product-modal">
