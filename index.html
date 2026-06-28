@@ -2991,6 +2991,11 @@ async function ghFetch(path, options = {}) {
 
 async function ghPut(path, content, message, sha) {
   const token = getGHToken();
+  // Always fetch the latest SHA before writing to avoid conflicts
+  try {
+    const latest = await ghFetch(path);
+    sha = latest.sha;
+  } catch(e) {}
   const body = { message, content: btoa(unescape(encodeURIComponent(content))), branch: GH_BRANCH };
   if (sha) body.sha = sha;
   const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
