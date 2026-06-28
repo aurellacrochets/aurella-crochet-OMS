@@ -2989,22 +2989,22 @@ async function ghFetch(path, options = {}) {
   return res.json();
 }
 
-async function ghPut(path, content, message, sha) {
+async function ghPut(path, content, message) {
   const token = getGHToken();
-  // Always fetch the latest SHA directly — no cache
-  try {
-    const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/vnd.github+json',
-        'Cache-Control': 'no-cache'
-      }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      sha = data.sha;
+  // Always get fresh SHA right before writing
+  const shaRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
     }
-  } catch(e) {}
+  });
+  let sha;
+  if (shaRes.ok) {
+    const shaData = await shaRes.json();
+    sha = shaData.sha;
+  }
   const body = { message, content: btoa(unescape(encodeURIComponent(content))), branch: GH_BRANCH };
   if (sha) body.sha = sha;
   const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
@@ -3281,7 +3281,7 @@ async function saveWebProduct() {
     // 4. Write products.js to GitHub
     showLoading('Committing products.js…');
     const content = buildProductsJs(webProducts);
-    await ghPut(GH_PRODUCTS_PATH, content, `Update product: ${name}`, window._productsJsSha);
+    await ghPut(GH_PRODUCTS_PATH, content, `Update product: ${name}`);
 
     // Refresh SHA
     const fresh = await ghFetch(GH_PRODUCTS_PATH);
@@ -3396,11 +3396,9 @@ async function submitAddWebProduct() {
 
     showLoading('Committing products.js…');
     const content = buildProductsJs(webProducts);
-    await ghPut(GH_PRODUCTS_PATH, content, `Add new product: ${name}`, window._productsJsSha);
+    await ghPut(GH_PRODUCTS_PATH, content, `Add new product: ${name}`);
 
-    const fresh = await ghFetch(GH_PRODUCTS_PATH);
-    window._productsJsSha = fresh.sha;
-
+    
     window._busyDeleting = false;
     hideLoading();
     closeModal('add-web-product-modal');
