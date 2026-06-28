@@ -3089,6 +3089,16 @@ if (typeof window !== "undefined") {
 `;
 }
 
+function parseCategories(content) {
+  try {
+    const fn = new Function(content + '\n return typeof categories !== "undefined" ? categories : [];');
+    const result = fn();
+    return Array.isArray(result) ? result : [];
+  } catch(e) {
+    return [];
+  }
+}
+
 async function initWebProductsPage() {
   const statusEl = document.getElementById('web-products-status');
   if (!getGHToken()) {
@@ -3099,10 +3109,16 @@ async function initWebProductsPage() {
   try {
     const content = await fetchProductsJs();
     webProducts = parseProductsJs(content);
+    const parsedCats = parseCategories(content);
+    if (parsedCats.length) {
+      webCategories = parsedCats;
+    } else {
       webCategories = [...new Set(webProducts.map(p => p.category))].map(cat => {
-      const p = webProducts.find(x => x.category === cat);
-      return { value: cat, label: p?.categoryLabel || cat };
-    });    statusEl.innerHTML = `<span style="color:var(--green)">✓ ${webProducts.length} products loaded from GitHub</span>`;
+        const p = webProducts.find(x => x.category === cat);
+        return { value: cat, label: p?.categoryLabel || cat };
+      });
+    }
+    statusEl.innerHTML = `<span style="color:var(--green)">✓ ${webProducts.length} products loaded from GitHub</span>`;
     renderWebProductsGrid(webProducts);
     populateCategoryFilters();
   } catch(e) {
