@@ -3043,14 +3043,12 @@ async function fetchProductsJs() {
 }
 
 function parseProductsJs(content) {
-  // Remove JS comments first
-  const stripped = content
-    .replace(/\/\*[\s\S]*?\*\//g, '')  // block comments
-    .replace(/\/\/[^\n]*/g, '');        // line comments
-  const match = stripped.match(/const products\s*=\s*(\[[\s\S]*?\])\s*;/);
-  if (!match) throw new Error('Could not parse products.js — array not found');
   try {
-    return JSON.parse(match[1]);
+    // Use Function constructor to safely evaluate the JS and extract the products array
+    const fn = new Function(content + '\n return products;');
+    const result = fn();
+    if (!Array.isArray(result)) throw new Error('products is not an array');
+    return result;
   } catch(e) {
     throw new Error('Could not parse products.js — ' + e.message);
   }
