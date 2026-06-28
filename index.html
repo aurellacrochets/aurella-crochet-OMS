@@ -3176,7 +3176,11 @@ function openWebProductDetail(id) {
 
   // Populate category dropdown
   const catSel = document.getElementById('wp-category');
-  catSel.innerHTML = webCategories.map(c => `<option value="${c}" ${c===p.category?'selected':''}>${c}</option>`).join('');
+  catSel.innerHTML = webCategories.map(c => {
+    const val = typeof c === 'string' ? c : c.value;
+    const lbl = typeof c === 'string' ? c : c.label;
+    return `<option value="${val}" ${val===p.category?'selected':''}>${lbl}</option>`;
+  }).join('');
 
   // Render current images
   renderWpImagesGrid(p.images || [p.image]);
@@ -3334,7 +3338,11 @@ function openAddWebProductModal() {
     document.getElementById(id).value = '';
   });
   const catSel = document.getElementById('awp-category');
-  catSel.innerHTML = webCategories.map(c => `<option value="${c}">${c}</option>`).join('');
+  catSel.innerHTML = webCategories.map(c => {
+    const val = typeof c === 'string' ? c : c.value;
+    const lbl = typeof c === 'string' ? c : c.label;
+    return `<option value="${val}">${lbl}</option>`;
+  }).join('');
   document.getElementById('add-web-product-modal').classList.add('open');
 }
 
