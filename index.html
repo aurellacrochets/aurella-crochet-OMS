@@ -626,6 +626,9 @@ h3 { font-size: 16px; font-weight: 600; }
 .loading-label { color:#fff; font-size:14px; }
 @keyframes spin { to { transform:rotate(360deg); } }
 
+/* ─── WEB PRODUCTS ───────────────────────────────────────── */
+.web-product-card:hover { transform: translateY(-2px); transition: transform .15s; }
+
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
@@ -711,6 +714,10 @@ h3 { font-size: 16px; font-weight: 600; }
     <div class="nav-item" data-page="products">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
       Products
+    </div>
+    <div class="nav-item" data-page="webproducts">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+      Web Products
     </div>
     <div class="nav-item danger-nav" data-page="deleteorders">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
@@ -1142,6 +1149,37 @@ h3 { font-size: 16px; font-weight: 600; }
       </tbody>
     </table>
   </div>
+</section>
+
+<!-- WEB PRODUCTS PAGE -->
+<section class="page" id="page-webproducts">
+  <div class="page-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <h2>Web Products</h2>
+        <p>Manage products on the Aurella Crochet website</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="configureGitHub()">⚙ GitHub Config</button>
+        <button class="btn btn-secondary btn-sm" onclick="openAddCategoryModal()">+ Category</button>
+        <button class="btn btn-primary btn-sm" onclick="openAddWebProductModal()">+ Add Product</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="web-products-status" style="margin-bottom:16px;font-size:13px;color:var(--muted)">Not connected — configure GitHub token to begin.</div>
+
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <div class="search-wrap" style="flex:1;min-width:200px;position:relative">
+      <span class="search-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span>
+      <input type="text" id="web-products-search" placeholder="Search web products…" oninput="filterWebProducts(this.value)">
+    </div>
+    <select id="web-category-filter" onchange="filterWebProducts(document.getElementById('web-products-search').value)" style="max-width:180px">
+      <option value="">All Categories</option>
+    </select>
+  </div>
+
+  <div id="web-products-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px"></div>
 </section>
 
 </main>
@@ -2441,6 +2479,7 @@ function navigate(page) {
   document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
   if (page==='neworder') initNewOrderPage();
   if (page==='deleteorders') renderDeleteList();
+  if (page==='webproducts') initWebProductsPage();
   if (page==='products') renderProductsTable();
   localStorage.setItem('aurella_last_page', page);
   window.scrollTo(0,0); closeSidebar();
@@ -2903,6 +2942,461 @@ async function submitBulkEdit() {
       renderOrdersTable();
     }
   });
+  // ═══════════════════════════════════════════════════════════
+// WEB PRODUCTS — GitHub Integration
+// ═══════════════════════════════════════════════════════════
+const GH_OWNER = 'aurellacrochets';
+const GH_REPO  = 'aurella-crochet';
+const GH_BRANCH = 'main';
+const GH_PRODUCTS_PATH = 'products.js';
+
+let webProducts = [];
+let webCategories = [];
+let wpEditingId = null;
+let wpNewImages = []; // { file, base64, name } for pending uploads
+let awpNewImages = []; // for add product modal
+
+function getGHToken() { return localStorage.getItem('aurella_gh_token') || ''; }
+
+function configureGitHub() {
+  document.getElementById('gh-token-input').value = getGHToken();
+  document.getElementById('github-config-modal').classList.add('open');
+}
+
+function saveGitHubConfig() {
+  const token = document.getElementById('gh-token-input').value.trim();
+  if (!token) { toast('Please enter a token', 'error'); return; }
+  localStorage.setItem('aurella_gh_token', token);
+  closeModal('github-config-modal');
+  toast('GitHub token saved', 'success');
+  initWebProductsPage();
+}
+
+async function ghFetch(path, options = {}) {
+  const token = getGHToken();
+  if (!token) throw new Error('No GitHub token configured');
+  const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}?ref=${GH_BRANCH}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json'
+    },
+    ...options
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `GitHub API error ${res.status}`);
+  }
+  return res.json();
+}
+
+async function ghPut(path, content, message, sha) {
+  const token = getGHToken();
+  const body = { message, content: btoa(unescape(encodeURIComponent(content))), branch: GH_BRANCH };
+  if (sha) body.sha = sha;
+  const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `GitHub write error ${res.status}`);
+  }
+  return res.json();
+}
+
+async function ghUploadImage(path, base64Data, message) {
+  const token = getGHToken();
+  // Check if file exists (to get SHA for update)
+  let sha;
+  try {
+    const existing = await ghFetch(path);
+    sha = existing.sha;
+  } catch(e) { sha = null; }
+  const body = { message, content: base64Data, branch: GH_BRANCH };
+  if (sha) body.sha = sha;
+  const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Image upload failed');
+  }
+  return res.json();
+}
+
+async function fetchProductsJs() {
+  const data = await ghFetch(GH_PRODUCTS_PATH);
+  const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+  window._productsJsSha = data.sha;
+  return content;
+}
+
+function parseProductsJs(content) {
+  // Extract the array from `const products = [...]`
+  const match = content.match(/const products\s*=\s*(\[[\s\S]*?\]);/);
+  if (!match) throw new Error('Could not parse products.js');
+  return JSON.parse(match[1]);
+}
+
+function buildProductsJs(products) {
+  return `/* ==========================================================================
+   AURELLA CROCHETS — products.js
+   Single source of truth for product data, used by the navbar live search,
+   the search.html results page, the product.html landing page, and the
+   image slider / carousel on the gallery.
+
+   images[0] = primary (existing real photo), images[1-3] = placeholders
+   to be replaced with real photos when available.
+   ========================================================================== */
+
+const products = ${JSON.stringify(products, null, 2)};
+
+if (typeof window !== "undefined") {
+  window.AURELLA_PRODUCTS = products;
+}
+`;
+}
+
+async function initWebProductsPage() {
+  const statusEl = document.getElementById('web-products-status');
+  if (!getGHToken()) {
+    statusEl.innerHTML = `<span style="color:var(--red)">⚠ No GitHub token — <a href="#" onclick="configureGitHub();return false" style="color:var(--accent)">configure now</a></span>`;
+    return;
+  }
+  statusEl.textContent = 'Fetching products from GitHub…';
+  try {
+    const content = await fetchProductsJs();
+    webProducts = parseProductsJs(content);
+    webCategories = [...new Set(webProducts.map(p => p.category))];
+    statusEl.innerHTML = `<span style="color:var(--green)">✓ ${webProducts.length} products loaded from GitHub</span>`;
+    renderWebProductsGrid(webProducts);
+    populateCategoryFilters();
+  } catch(e) {
+    statusEl.innerHTML = `<span style="color:var(--red)">✗ ${e.message}</span>`;
+  }
+}
+
+function populateCategoryFilters() {
+  const filter = document.getElementById('web-category-filter');
+  filter.innerHTML = '<option value="">All Categories</option>' +
+    webCategories.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+function filterWebProducts(q) {
+  const cat = document.getElementById('web-category-filter').value;
+  const query = q.toLowerCase();
+  const filtered = webProducts.filter(p => {
+    const matchQ = !query || `${p.name} ${p.category} ${p.description||''}`.toLowerCase().includes(query);
+    const matchC = !cat || p.category === cat;
+    return matchQ && matchC;
+  });
+  renderWebProductsGrid(filtered);
+}
+
+function renderWebProductsGrid(products) {
+  const grid = document.getElementById('web-products-grid');
+  if (!products.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--muted)">No products found</div>`;
+    return;
+  }
+  grid.innerHTML = products.map(p => `
+    <div class="web-product-card" onclick="openWebProductDetail('${p.id}')" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="aspect-ratio:1;overflow:hidden;background:#1a1a1a">
+        <img src="${p.image}" alt="${esc(p.name)}" style="width:100%;height:100%;object-fit:cover" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text y=%2255%22 x=%2250%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2230%22>🧶</text></svg>'">
+      </div>
+      <div style="padding:10px">
+        <div style="font-size:12px;color:var(--accent2);margin-bottom:2px">${esc(p.category)}</div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:2px">${esc(p.name)}</div>
+        <div style="font-size:12px;color:var(--muted)">${esc(p.price||'₹NA')}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openWebProductDetail(id) {
+  const p = webProducts.find(x => x.id === id);
+  if (!p) return;
+  wpEditingId = id;
+  wpNewImages = [];
+  document.getElementById('web-product-modal-title').textContent = 'Edit: ' + p.name;
+  document.getElementById('wp-id').value = p.id;
+  document.getElementById('wp-id-original').value = p.id;
+  document.getElementById('wp-name').value = p.name;
+  document.getElementById('wp-price').value = p.price || '';
+  document.getElementById('wp-description').value = p.description || '';
+  document.getElementById('wp-keywords').value = (p.keywords||[]).join(', ');
+  document.getElementById('wp-material').value = p.details?.material || '';
+  document.getElementById('wp-sizes').value = p.details?.sizes || '';
+  document.getElementById('wp-dimensions').value = p.details?.dimensions || '';
+  document.getElementById('wp-care').value = p.details?.care || '';
+  document.getElementById('wp-delivery').value = p.details?.deliveryTime || '';
+  document.getElementById('wp-customizable').value = p.details?.customizable || '';
+
+  // Populate category dropdown
+  const catSel = document.getElementById('wp-category');
+  catSel.innerHTML = webCategories.map(c => `<option value="${c}" ${c===p.category?'selected':''}>${c}</option>`).join('');
+
+  // Render current images
+  renderWpImagesGrid(p.images || [p.image]);
+  document.getElementById('web-product-modal').classList.add('open');
+}
+
+function renderWpImagesGrid(images) {
+  const grid = document.getElementById('wp-images-grid');
+  const slots = [...images, ...Array(4)].slice(0,4);
+  grid.innerHTML = slots.map((src, i) => {
+    if (src) {
+      return `<div style="position:relative;aspect-ratio:1;background:#1a1a1a;border-radius:6px;overflow:hidden">
+        <img src="${src}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.background='#333'">
+        <div style="position:absolute;top:4px;right:4px;display:flex;gap:4px">
+          <button onclick="replaceWebImage(${i})" style="background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer">↑</button>
+          <button onclick="removeWebImage(${i})" style="background:rgba(248,113,113,.8);border:none;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer">✕</button>
+        </div>
+      </div>`;
+    }
+    return `<div style="aspect-ratio:1;background:#1a1a2a;border:1px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:22px;color:var(--muted)" onclick="document.getElementById('wp-image-upload').click()">+</div>`;
+  }).join('');
+  // Store current images in a data attr for easy access
+  grid.dataset.images = JSON.stringify(images);
+}
+
+function replaceWebImage(index) {
+  window._wpReplaceIndex = index;
+  const input = document.getElementById('wp-image-upload');
+  input.dataset.replaceIndex = index;
+  input.click();
+}
+
+function removeWebImage(index) {
+  const images = JSON.parse(document.getElementById('wp-images-grid').dataset.images || '[]');
+  images.splice(index, 1);
+  renderWpImagesGrid(images);
+}
+
+function handleWebProductImages(input) {
+  const replaceIndex = input.dataset.replaceIndex !== undefined ? parseInt(input.dataset.replaceIndex) : -1;
+  input.dataset.replaceIndex = '';
+  const files = Array.from(input.files);
+  files.forEach((file, i) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const base64Full = e.target.result;
+      const base64Data = base64Full.split(',')[1];
+      const images = JSON.parse(document.getElementById('wp-images-grid').dataset.images || '[]');
+      const fileName = file.name;
+      if (replaceIndex >= 0 && i === 0) {
+        // Replace specific slot
+        wpNewImages = wpNewImages.filter(x => x.index !== replaceIndex);
+        wpNewImages.push({ file, base64: base64Data, name: fileName, index: replaceIndex, preview: base64Full });
+        images[replaceIndex] = base64Full; // preview only
+      } else {
+        const slot = images.length < 4 ? images.length : -1;
+        if (slot >= 0) {
+          wpNewImages.push({ file, base64: base64Data, name: fileName, index: slot, preview: base64Full });
+          images.push(base64Full);
+        }
+      }
+      renderWpImagesGrid(images.slice(0,4));
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+
+async function saveWebProduct() {
+  const id = document.getElementById('wp-id').value.trim();
+  const originalId = document.getElementById('wp-id-original').value;
+  const name = document.getElementById('wp-name').value.trim();
+  const category = document.getElementById('wp-category').value;
+  if (!id || !name || !category) { toast('ID, Name and Category are required', 'error'); return; }
+
+  showLoading('Syncing to website…');
+  window._busyDeleting = true;
+
+  try {
+    // 1. Upload any new images
+    let currentImages = JSON.parse(document.getElementById('wp-images-grid').dataset.images || '[]');
+    for (const img of wpNewImages) {
+      showLoading(`Uploading image ${img.name}…`);
+      const repoPath = `Images/${category}/${img.name}`;
+      await ghUploadImage(repoPath, img.base64, `Upload image ${img.name} for ${name}`);
+      currentImages[img.index] = repoPath;
+    }
+
+    // 2. Build updated product
+    const updated = {
+      id,
+      name,
+      category,
+      categoryLabel: document.getElementById('wp-category').options[document.getElementById('wp-category').selectedIndex].text,
+      price: document.getElementById('wp-price').value || '₹NA',
+      description: document.getElementById('wp-description').value,
+      image: currentImages[0] || '',
+      images: currentImages.filter(Boolean),
+      keywords: document.getElementById('wp-keywords').value.split(',').map(k=>k.trim()).filter(Boolean),
+      details: {
+        material: document.getElementById('wp-material').value,
+        sizes: document.getElementById('wp-sizes').value,
+        dimensions: document.getElementById('wp-dimensions').value,
+        care: document.getElementById('wp-care').value,
+        deliveryTime: document.getElementById('wp-delivery').value,
+        customizable: document.getElementById('wp-customizable').value
+      }
+    };
+
+    // 3. Update products array
+    const idx = webProducts.findIndex(p => p.id === originalId);
+    if (idx >= 0) webProducts[idx] = updated;
+
+    // 4. Write products.js to GitHub
+    showLoading('Committing products.js…');
+    const content = buildProductsJs(webProducts);
+    await ghPut(GH_PRODUCTS_PATH, content, `Update product: ${name}`, window._productsJsSha);
+
+    // Refresh SHA
+    const fresh = await ghFetch(GH_PRODUCTS_PATH);
+    window._productsJsSha = fresh.sha;
+
+    window._busyDeleting = false;
+    hideLoading();
+    closeModal('web-product-modal');
+    renderWebProductsGrid(webProducts);
+    toast(`${name} updated — website will refresh in ~30s`, 'success');
+  } catch(e) {
+    window._busyDeleting = false;
+    hideLoading();
+    toast(e.message || 'Sync failed', 'error');
+  }
+}
+
+function openAddCategoryModal() {
+  document.getElementById('new-category-name').value = '';
+  document.getElementById('new-category-label').value = '';
+  document.getElementById('add-category-modal').classList.add('open');
+}
+
+function saveNewCategory() {
+  const name = document.getElementById('new-category-name').value.trim();
+  const label = document.getElementById('new-category-label').value.trim() || name;
+  if (!name) { toast('Category name required', 'error'); return; }
+  if (webCategories.includes(name)) { toast('Category already exists', 'error'); return; }
+  webCategories.push(name);
+  populateCategoryFilters();
+  closeModal('add-category-modal');
+  toast(`Category "${name}" added — assign products to it to make it appear on the website`, 'success');
+}
+
+function openAddWebProductModal() {
+  awpNewImages = [];
+  document.getElementById('awp-images-preview').innerHTML = '';
+  ['awp-id','awp-name','awp-price','awp-description','awp-keywords','awp-material','awp-sizes','awp-dimensions','awp-care','awp-delivery','awp-customizable'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  const catSel = document.getElementById('awp-category');
+  catSel.innerHTML = webCategories.map(c => `<option value="${c}">${c}</option>`).join('');
+  document.getElementById('add-web-product-modal').classList.add('open');
+}
+
+function handleAddWebProductImages(input) {
+  const files = Array.from(input.files);
+  files.forEach(file => {
+    if (awpNewImages.length >= 4) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      awpNewImages.push({ file, base64: e.target.result.split(',')[1], name: file.name, preview: e.target.result });
+      renderAwpPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+
+function renderAwpPreview() {
+  const wrap = document.getElementById('awp-images-preview');
+  wrap.innerHTML = awpNewImages.map((img, i) => `
+    <div style="position:relative;width:80px;height:80px;border-radius:6px;overflow:hidden">
+      <img src="${img.preview}" style="width:100%;height:100%;object-fit:cover">
+      <button onclick="awpNewImages.splice(${i},1);renderAwpPreview()" style="position:absolute;top:2px;right:2px;background:rgba(248,113,113,.9);border:none;color:#fff;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">✕</button>
+    </div>
+  `).join('');
+}
+
+async function submitAddWebProduct() {
+  const id = document.getElementById('awp-id').value.trim();
+  const name = document.getElementById('awp-name').value.trim();
+  const category = document.getElementById('awp-category').value;
+  if (!id || !name || !category) { toast('ID, Name and Category are required', 'error'); return; }
+  if (webProducts.find(p => p.id === id)) { toast('Product ID already exists', 'error'); return; }
+
+  showLoading('Adding product to website…');
+  window._busyDeleting = true;
+
+  try {
+    // Upload images
+    const imagePaths = [];
+    for (let i = 0; i < awpNewImages.length; i++) {
+      const img = awpNewImages[i];
+      showLoading(`Uploading image ${i+1} of ${awpNewImages.length}…`);
+      const repoPath = `Images/${category}/${img.name}`;
+      await ghUploadImage(repoPath, img.base64, `Upload image for new product: ${name}`);
+      imagePaths.push(repoPath);
+    }
+
+    const newProduct = {
+      id,
+      name,
+      category,
+      categoryLabel: category,
+      price: document.getElementById('awp-price').value || '₹NA',
+      description: document.getElementById('awp-description').value,
+      image: imagePaths[0] || '',
+      images: imagePaths,
+      keywords: document.getElementById('awp-keywords').value.split(',').map(k=>k.trim()).filter(Boolean),
+      details: {
+        material: document.getElementById('awp-material').value,
+        sizes: document.getElementById('awp-sizes').value,
+        dimensions: document.getElementById('awp-dimensions').value,
+        care: document.getElementById('awp-care').value,
+        deliveryTime: document.getElementById('awp-delivery').value,
+        customizable: document.getElementById('awp-customizable').value
+      }
+    };
+
+    webProducts.push(newProduct);
+
+    showLoading('Committing products.js…');
+    const content = buildProductsJs(webProducts);
+    await ghPut(GH_PRODUCTS_PATH, content, `Add new product: ${name}`, window._productsJsSha);
+
+    const fresh = await ghFetch(GH_PRODUCTS_PATH);
+    window._productsJsSha = fresh.sha;
+
+    window._busyDeleting = false;
+    hideLoading();
+    closeModal('add-web-product-modal');
+    renderWebProductsGrid(webProducts);
+    toast(`${name} added to website — will appear in ~30s`, 'success');
+  } catch(e) {
+    window._busyDeleting = false;
+    hideLoading();
+    toast(e.message || 'Failed to add product', 'error');
+  }
+}
+
+function closeModal(id) {
+  document.getElementById(id)?.classList.remove('open');
+}
 </script>
 <!-- BULK ADD PRODUCTS MODAL -->
 <div class="modal-overlay" id="bulk-add-modal">
@@ -2936,6 +3430,163 @@ async function submitBulkEdit() {
     <div class="form-actions">
       <button class="btn btn-primary" onclick="submitBulkEdit()">↑ Apply Changes</button>
       <button class="btn btn-secondary" onclick="closeBulkEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+<!-- GITHUB CONFIG MODAL -->
+<div class="modal-overlay" id="github-config-modal">
+  <div class="modal" style="max-width:480px">
+    <h3 style="margin-bottom:8px">GitHub Configuration</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Your token is stored locally and never sent anywhere except GitHub's API.</p>
+    <div class="form-group">
+      <label class="form-label">Personal Access Token <span class="req">*</span></label>
+      <input type="password" id="gh-token-input" placeholder="ghp_xxxxxxxxxxxx">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveGitHubConfig()">Save & Connect</button>
+      <button class="btn btn-secondary" onclick="closeModal('github-config-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CATEGORY MODAL -->
+<div class="modal-overlay" id="add-category-modal">
+  <div class="modal" style="max-width:400px">
+    <h3 style="margin-bottom:16px">Add New Category</h3>
+    <div class="form-group">
+      <label class="form-label">Category Name <span class="req">*</span></label>
+      <input type="text" id="new-category-name" placeholder="e.g. Plushies">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category Label (display name)</label>
+      <input type="text" id="new-category-label" placeholder="e.g. Plushies & Toys">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveNewCategory()">Add Category</button>
+      <button class="btn btn-secondary" onclick="closeModal('add-category-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- WEB PRODUCT DETAIL MODAL -->
+<div class="modal-overlay" id="web-product-modal">
+  <div class="modal" style="max-width:700px;max-height:90vh;overflow-y:auto">
+    <h3 id="web-product-modal-title" style="margin-bottom:20px">Edit Product</h3>
+
+    <!-- Images -->
+    <div style="margin-bottom:20px">
+      <label class="form-label">Images (up to 4)</label>
+      <div id="wp-images-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px"></div>
+      <input type="file" id="wp-image-upload" accept="image/*" multiple style="display:none" onchange="handleWebProductImages(this)">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('wp-image-upload').click()">↑ Upload Images</button>
+      <span style="font-size:12px;color:var(--muted);margin-left:8px">Uploaded images go to Images/&lt;Category&gt;/ in the repo</span>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Product ID <span class="req">*</span></label>
+        <input type="text" id="wp-id" placeholder="e.g. cardigan-4">
+        <input type="hidden" id="wp-id-original">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Name <span class="req">*</span></label>
+        <input type="text" id="wp-name" placeholder="e.g. Sage Comfort Cardigan">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category <span class="req">*</span></label>
+        <select id="wp-category"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Price</label>
+        <input type="text" id="wp-price" placeholder="e.g. ₹1,200 or ₹NA">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea id="wp-description" rows="3" style="width:100%;resize:vertical"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Keywords (comma separated)</label>
+      <input type="text" id="wp-keywords" placeholder="e.g. cardigan, sage, cozy">
+    </div>
+
+    <div style="margin-bottom:16px">
+      <label class="form-label">Product Details</label>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label" style="font-size:11px">Material</label><input type="text" id="wp-material"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Sizes</label><input type="text" id="wp-sizes"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Dimensions</label><input type="text" id="wp-dimensions"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Care</label><input type="text" id="wp-care"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Delivery Time</label><input type="text" id="wp-delivery"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Customizable</label><input type="text" id="wp-customizable"></div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveWebProduct()">✓ Save & Sync to Website</button>
+      <button class="btn btn-secondary" onclick="closeModal('web-product-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD WEB PRODUCT MODAL -->
+<div class="modal-overlay" id="add-web-product-modal">
+  <div class="modal" style="max-width:700px;max-height:90vh;overflow-y:auto">
+    <h3 style="margin-bottom:20px">Add New Web Product</h3>
+
+    <div style="margin-bottom:20px">
+      <label class="form-label">Images (up to 4)</label>
+      <div id="awp-images-preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
+      <input type="file" id="awp-image-upload" accept="image/*" multiple style="display:none" onchange="handleAddWebProductImages(this)">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('awp-image-upload').click()">↑ Upload Images</button>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Product ID <span class="req">*</span></label>
+        <input type="text" id="awp-id" placeholder="e.g. cardigan-4">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Name <span class="req">*</span></label>
+        <input type="text" id="awp-name" placeholder="e.g. Sage Comfort Cardigan">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category <span class="req">*</span></label>
+        <select id="awp-category"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Price</label>
+        <input type="text" id="awp-price" placeholder="e.g. ₹1,200 or ₹NA">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea id="awp-description" rows="3" style="width:100%;resize:vertical"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Keywords (comma separated)</label>
+      <input type="text" id="awp-keywords" placeholder="e.g. cardigan, sage, cozy">
+    </div>
+
+    <div style="margin-bottom:16px">
+      <label class="form-label">Product Details</label>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label" style="font-size:11px">Material</label><input type="text" id="awp-material"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Sizes</label><input type="text" id="awp-sizes"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Dimensions</label><input type="text" id="awp-dimensions"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Care</label><input type="text" id="awp-care"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Delivery Time</label><input type="text" id="awp-delivery"></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Customizable</label><input type="text" id="awp-customizable"></div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="submitAddWebProduct()">+ Add to Website</button>
+      <button class="btn btn-secondary" onclick="closeModal('add-web-product-modal')">Cancel</button>
     </div>
   </div>
 </div>
