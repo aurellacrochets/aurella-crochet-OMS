@@ -3095,8 +3095,10 @@ async function initWebProductsPage() {
   try {
     const content = await fetchProductsJs();
     webProducts = parseProductsJs(content);
-    webCategories = [...new Set(webProducts.map(p => p.category))];
-    statusEl.innerHTML = `<span style="color:var(--green)">✓ ${webProducts.length} products loaded from GitHub</span>`;
+      webCategories = [...new Set(webProducts.map(p => p.category))].map(cat => {
+      const p = webProducts.find(x => x.category === cat);
+      return { value: cat, label: p?.categoryLabel || cat };
+    });    statusEl.innerHTML = `<span style="color:var(--green)">✓ ${webProducts.length} products loaded from GitHub</span>`;
     renderWebProductsGrid(webProducts);
     populateCategoryFilters();
   } catch(e) {
@@ -3106,8 +3108,14 @@ async function initWebProductsPage() {
 
 function populateCategoryFilters() {
   const filter = document.getElementById('web-category-filter');
-  filter.innerHTML = '<option value="">All Categories</option>' +
-    webCategories.map(c => `<option value="${c}">${c}</option>`).join('');
+  const catSels = [filter, document.getElementById('wp-category'), document.getElementById('awp-category')];
+  const opts = '<option value="">All Categories</option>' +
+    webCategories.map(c => {
+      const val = typeof c === 'string' ? c : c.value;
+      const lbl = typeof c === 'string' ? c : c.label;
+      return `<option value="${val}">${lbl}</option>`;
+    }).join('');
+  catSels.forEach(el => { if (el) el.innerHTML = opts; });
 }
 
 function filterWebProducts(q) {
@@ -3244,19 +3252,22 @@ async function saveWebProduct() {
   try {
     // 1. Upload any new images
     let currentImages = JSON.parse(document.getElementById('wp-images-grid').dataset.images || '[]');
+    // Replace base64 previews with actual repo paths after upload
     for (const img of wpNewImages) {
       showLoading(`Uploading image ${img.name}…`);
       const repoPath = `Images/${category}/${img.name}`;
       await ghUploadImage(repoPath, img.base64, `Upload image ${img.name} for ${name}`);
       currentImages[img.index] = repoPath;
     }
+    // Strip out any remaining base64 previews (not yet uploaded) 
+    currentImages = currentImages.filter(src => src && !src.startsWith('data:'));
 
     // 2. Build updated product
     const updated = {
       id,
       name,
       category,
-      categoryLabel: document.getElementById('wp-category').options[document.getElementById('wp-category').selectedIndex].text,
+      categoryLabel: (() => { const sel = document.getElementById('wp-category'); const opt = sel.options[sel.selectedIndex]; return opt ? opt.text : category; })(),  
       price: document.getElementById('wp-price').value || '₹NA',
       description: document.getElementById('wp-description').value,
       image: currentImages[0] || '',
@@ -3281,10 +3292,6 @@ async function saveWebProduct() {
     const content = buildProductsJs(webProducts);
     await ghPut(GH_PRODUCTS_PATH, content, `Update product: ${name}`);
 
-    // Refresh SHA
-    const fresh = await ghFetch(GH_PRODUCTS_PATH);
-    window._productsJsSha = fresh.sha;
-
     window._busyDeleting = false;
     hideLoading();
     closeModal('web-product-modal');
@@ -3307,11 +3314,11 @@ function saveNewCategory() {
   const name = document.getElementById('new-category-name').value.trim();
   const label = document.getElementById('new-category-label').value.trim() || name;
   if (!name) { toast('Category name required', 'error'); return; }
-  if (webCategories.includes(name)) { toast('Category already exists', 'error'); return; }
-  webCategories.push(name);
+  if (webCategories.find(c => c.value === name)) { toast('Category already exists', 'error'); return; }
+  webCategories.push({ value: name, label });
   populateCategoryFilters();
   closeModal('add-category-modal');
-  toast(`Category "${name}" added — assign products to it to make it appear on the website`, 'success');
+  toast(`Category "${name}" added`, 'success');
 }
 
 function openAddWebProductModal() {
