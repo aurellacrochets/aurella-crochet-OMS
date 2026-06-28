@@ -3319,7 +3319,7 @@ async function saveWebProduct() {
 
     // 4. Write products.js to GitHub
     showLoading('Committing products.js…');
-    const content = buildProductsJs(webProducts);
+    const content = buildProductsJs(webProducts, webCategories);
     await ghPut(GH_PRODUCTS_PATH, content, `Update product: ${name}`);
 
     window._busyDeleting = false;
@@ -3438,7 +3438,7 @@ async function submitAddWebProduct() {
     webProducts.push(newProduct);
 
     showLoading('Committing products.js…');
-    const content = buildProductsJs(webProducts);
+    const content = buildProductsJs(webProducts, webCategories);
     await ghPut(GH_PRODUCTS_PATH, content, `Add new product: ${name}`);
 
     
@@ -3475,7 +3475,7 @@ async function executeDeleteWebProduct() {
   try {
     showLoading('Removing product from website…');
     webProducts = webProducts.filter(p => p.id !== _wpToDelete);
-    const content = buildProductsJs(webProducts);
+    const content = buildProductsJs(webProducts, webCategories);
     await ghPut(GH_PRODUCTS_PATH, content, `Remove product: ${_wpToDelete}`);
     hideLoading();
     closeModal('delete-web-product-modal');
