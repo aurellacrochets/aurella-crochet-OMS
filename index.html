@@ -3066,7 +3066,8 @@ function parseProductsJs(content) {
   }
 }
 
-function buildProductsJs(products) {
+function buildProductsJs(products, categories) {
+  const cats = categories || webCategories;
   return `/* ==========================================================================
    AURELLA CROCHETS — products.js
    Single source of truth for product data, used by the navbar live search,
@@ -3079,8 +3080,11 @@ function buildProductsJs(products) {
 
 const products = ${JSON.stringify(products, null, 2)};
 
+const categories = ${JSON.stringify(cats, null, 2)};
+
 if (typeof window !== "undefined") {
   window.AURELLA_PRODUCTS = products;
+  window.AURELLA_CATEGORIES = categories;
 }
 `;
 }
@@ -3320,15 +3324,24 @@ function openAddCategoryModal() {
   document.getElementById('add-category-modal').classList.add('open');
 }
 
-function saveNewCategory() {
+async function saveNewCategory() {
   const name = document.getElementById('new-category-name').value.trim();
   const label = document.getElementById('new-category-label').value.trim() || name;
   if (!name) { toast('Category name required', 'error'); return; }
   if (webCategories.find(c => c.value === name)) { toast('Category already exists', 'error'); return; }
   webCategories.push({ value: name, label });
   populateCategoryFilters();
+  try {
+    showLoading('Saving category to website…');
+    const content = buildProductsJs(webProducts, webCategories);
+    await ghPut(GH_PRODUCTS_PATH, content, `Add category: ${name}`);
+    hideLoading();
+    toast(`Category "${name}" added and synced to website`, 'success');
+  } catch(e) {
+    hideLoading();
+    toast(e.message || 'Category saved locally but failed to sync to GitHub', 'error');
+  }
   closeModal('add-category-modal');
-  toast(`Category "${name}" added`, 'success');
 }
 
 function openAddWebProductModal() {
