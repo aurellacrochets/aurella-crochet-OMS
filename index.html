@@ -3043,10 +3043,17 @@ async function fetchProductsJs() {
 }
 
 function parseProductsJs(content) {
-  // Extract the array from `const products = [...]`
-  const match = content.match(/const products\s*=\s*(\[[\s\S]*?\]);/);
-  if (!match) throw new Error('Could not parse products.js');
-  return JSON.parse(match[1]);
+  // Remove JS comments first
+  const stripped = content
+    .replace(/\/\*[\s\S]*?\*\//g, '')  // block comments
+    .replace(/\/\/[^\n]*/g, '');        // line comments
+  const match = stripped.match(/const products\s*=\s*(\[[\s\S]*?\])\s*;/);
+  if (!match) throw new Error('Could not parse products.js — array not found');
+  try {
+    return JSON.parse(match[1]);
+  } catch(e) {
+    throw new Error('Could not parse products.js — ' + e.message);
+  }
 }
 
 function buildProductsJs(products) {
