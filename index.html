@@ -3345,17 +3345,18 @@ async function saveNewCategory() {
   const label = document.getElementById('new-category-label').value.trim() || name;
   if (!name) { toast('Category name required', 'error'); return; }
   if (webCategories.find(c => c.value === name)) { toast('Category already exists', 'error'); return; }
-  webCategories.push({ value: name, label });
-  populateCategoryFilters();
   try {
     showLoading('Saving category to website…');
-    const content = buildProductsJs(webProducts, webCategories);
+    const updated = [...webCategories, { value: name, label }];
+    const content = buildProductsJs(webProducts, updated);
     await ghPut(GH_PRODUCTS_PATH, content, `Add category: ${name}`);
+    webCategories = updated;
+    populateCategoryFilters();
     hideLoading();
     toast(`Category "${name}" added and synced to website`, 'success');
   } catch(e) {
     hideLoading();
-    toast(e.message || 'Category saved locally but failed to sync to GitHub', 'error');
+    toast(e.message || 'Failed to sync — category NOT added', 'error');
   }
   closeModal('add-category-modal');
 }
@@ -3516,12 +3517,22 @@ function renderCategoryList() {
   }).join('');
 }
 
-function deleteWebCategory(val) {
+async function deleteWebCategory(val) {
   if (!confirm(`Delete category "${val}"? This cannot be undone.`)) return;
-  webCategories = webCategories.filter(c => (typeof c === 'string' ? c : c.value) !== val);
-  populateCategoryFilters();
-  renderCategoryList();
-  toast(`Category "${val}" deleted`, 'success');
+  try {
+    showLoading('Saving category changes to website…');
+    const updated = webCategories.filter(c => (typeof c === 'string' ? c : c.value) !== val);
+    const content = buildProductsJs(webProducts, updated);
+    await ghPut(GH_PRODUCTS_PATH, content, `Delete category: ${val}`);
+    webCategories = updated;
+    populateCategoryFilters();
+    renderCategoryList();
+    toast(`Category "${val}" deleted and synced`, 'success');
+  } catch (e) {
+    toast(e.message || 'Failed to sync — category NOT deleted', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 function openAddCategoryFromManage() {
