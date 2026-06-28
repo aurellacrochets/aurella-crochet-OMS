@@ -3337,12 +3337,7 @@ function openAddWebProductModal() {
   ['awp-id','awp-name','awp-price','awp-description','awp-keywords','awp-material','awp-sizes','awp-dimensions','awp-care','awp-delivery','awp-customizable'].forEach(id => {
     document.getElementById(id).value = '';
   });
-  const catSel = document.getElementById('awp-category');
-  catSel.innerHTML = webCategories.map(c => {
-    const val = typeof c === 'string' ? c : c.value;
-    const lbl = typeof c === 'string' ? c : c.label;
-    return `<option value="${val}">${lbl}</option>`;
-  }).join('');
+  populateCategoryFilters();
   document.getElementById('add-web-product-modal').classList.add('open');
 }
 
