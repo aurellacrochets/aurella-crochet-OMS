@@ -2995,9 +2995,7 @@ async function ghPut(path, content, message) {
   const shaRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
-      'Accept': 'application/vnd.github+json',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache'
+      'Accept': 'application/vnd.github+json'
     }
   });
   let sha;
@@ -3132,7 +3130,7 @@ function renderWebProductsGrid(products) {
   grid.innerHTML = products.map(p => `
     <div class="web-product-card" onclick="openWebProductDetail('${p.id}')" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
       <div style="aspect-ratio:1;overflow:hidden;background:#1a1a1a">
-        <img src="${p.image}" alt="${esc(p.name)}" style="width:100%;height:100%;object-fit:cover" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text y=%2255%22 x=%2250%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2230%22>🧶</text></svg>'">
+        <img src="${p.image.startsWith('http') ? p.image : `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/${p.image}`}" alt="${esc(p.name)}" style="width:100%;height:100%;object-fit:cover" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text y=%2255%22 x=%2250%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2230%22>🧶</text></svg>'">
       </div>
       <div style="padding:10px">
         <div style="font-size:12px;color:var(--accent2);margin-bottom:2px">${esc(p.category)}</div>
@@ -3177,7 +3175,7 @@ function renderWpImagesGrid(images) {
   grid.innerHTML = slots.map((src, i) => {
     if (src) {
       return `<div style="position:relative;aspect-ratio:1;background:#1a1a1a;border-radius:6px;overflow:hidden">
-        <img src="${src}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.background='#333'">
+        <img src="${src.startsWith('http') ? src : `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/${src}`}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.background='#333'">
         <div style="position:absolute;top:4px;right:4px;display:flex;gap:4px">
           <button onclick="replaceWebImage(${i})" style="background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer">↑</button>
           <button onclick="removeWebImage(${i})" style="background:rgba(248,113,113,.8);border:none;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer">✕</button>
