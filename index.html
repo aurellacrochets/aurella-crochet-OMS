@@ -1161,7 +1161,7 @@ h3 { font-size: 16px; font-weight: 600; }
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="configureGitHub()">⚙ GitHub Config</button>
-        <button class="btn btn-secondary btn-sm" onclick="openAddCategoryModal()">+ Category</button>
+        <button class="btn btn-secondary btn-sm" onclick="openManageCategoriesModal()">⊞ Categories</button>
         <button class="btn btn-primary btn-sm" onclick="openAddWebProductModal()">+ Add Product</button>
       </div>
     </div>
@@ -3136,14 +3136,20 @@ function renderWebProductsGrid(products) {
     return;
   }
   grid.innerHTML = products.map(p => `
-    <div class="web-product-card" onclick="openWebProductDetail('${p.id}')" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-      <div style="aspect-ratio:1;overflow:hidden;background:#1a1a1a">
+    <div class="web-product-card" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="aspect-ratio:1;overflow:hidden;background:#1a1a1a;cursor:pointer" onclick="openWebProductDetail('${p.id}')">
         <img src="${p.image.startsWith('http') ? p.image : `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/${p.image}`}" alt="${esc(p.name)}" style="width:100%;height:100%;object-fit:cover" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text y=%2255%22 x=%2250%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2230%22>🧶</text></svg>'">
       </div>
       <div style="padding:10px">
         <div style="font-size:12px;color:var(--accent2);margin-bottom:2px">${esc(p.category)}</div>
-        <div style="font-weight:600;font-size:13px;margin-bottom:2px">${esc(p.name)}</div>
-        <div style="font-size:12px;color:var(--muted)">${esc(p.price||'₹NA')}</div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px;cursor:pointer" onclick="openWebProductDetail('${p.id}')">${esc(p.name)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${esc(p.price||'₹NA')}</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-sm" style="flex:1;font-size:11px" onclick="openWebProductDetail('${p.id}')">✎ Edit</button>
+          <button class="btn btn-danger btn-sm" style="font-size:11px;padding:5px 8px" onclick="confirmDeleteWebProduct('${p.id}','${esc(p.name)}')">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   `).join('');
@@ -3419,7 +3425,110 @@ async function submitAddWebProduct() {
 function closeModal(id) {
   document.getElementById(id)?.classList.remove('open');
 }
+
+// ── DELETE WEB PRODUCT ────────────────────────────────────────
+let _wpToDelete = null;
+
+function confirmDeleteWebProduct(id, name) {
+  _wpToDelete = id;
+  document.getElementById('del-wp-name').textContent = name;
+  document.getElementById('del-wp-id').textContent = id;
+  document.getElementById('delete-web-product-modal').classList.add('open');
+}
+
+async function executeDeleteWebProduct() {
+  if (!_wpToDelete) return;
+  const btn = document.getElementById('del-wp-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  try {
+    showLoading('Removing product from website…');
+    webProducts = webProducts.filter(p => p.id !== _wpToDelete);
+    const content = buildProductsJs(webProducts);
+    await ghPut(GH_PRODUCTS_PATH, content, `Remove product: ${_wpToDelete}`);
+    hideLoading();
+    closeModal('delete-web-product-modal');
+    renderWebProductsGrid(webProducts);
+    toast('Product deleted from website', 'success');
+  } catch(e) {
+    hideLoading();
+    toast(e.message || 'Delete failed', 'error');
+  }
+  btn.disabled = false; btn.textContent = 'Delete Permanently';
+  _wpToDelete = null;
+}
+
+// ── MANAGE CATEGORIES ─────────────────────────────────────────
+function openManageCategoriesModal() {
+  renderCategoryList();
+  closeModal('add-category-modal');
+  document.getElementById('manage-categories-modal').classList.add('open');
+}
+
+function renderCategoryList() {
+  const list = document.getElementById('category-manage-list');
+  if (!webCategories.length) {
+    list.innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">No categories yet</div>`;
+    return;
+  }
+  list.innerHTML = webCategories.map(c => {
+    const val = typeof c === 'string' ? c : c.value;
+    const lbl = typeof c === 'string' ? c : c.label;
+    const count = webProducts.filter(p => p.category === val).length;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500">${esc(lbl)}</div>
+        <div style="font-size:11px;color:var(--muted)">${val} · ${count} product(s)</div>
+      </div>
+      <button class="btn btn-danger btn-sm" ${count > 0 ? 'disabled title="Remove all products in this category first"' : `onclick="deleteWebCategory('${esc(val)}')"`} style="font-size:11px">✕ Delete</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteWebCategory(val) {
+  if (!confirm(`Delete category "${val}"? This cannot be undone.`)) return;
+  webCategories = webCategories.filter(c => (typeof c === 'string' ? c : c.value) !== val);
+  populateCategoryFilters();
+  renderCategoryList();
+  toast(`Category "${val}" deleted`, 'success');
+}
+
+function openAddCategoryFromManage() {
+  document.getElementById('new-category-name').value = '';
+  document.getElementById('new-category-label').value = '';
+  document.getElementById('add-category-modal').classList.add('open');
+}
 </script>
+<!-- DELETE WEB PRODUCT MODAL -->
+<div class="modal-overlay" id="delete-web-product-modal">
+  <div class="modal modal-danger" style="max-width:420px">
+    <h3>⚠ Delete Web Product</h3>
+    <p style="color:var(--muted);font-size:13px;margin-top:8px">This will remove the product from <strong>products.js</strong> on GitHub and it will disappear from the website within ~30 seconds. This cannot be undone.</p>
+    <div class="delete-order-card" style="margin:16px 0">
+      <strong id="del-wp-name"></strong><br>
+      <span style="font-size:12px;color:var(--muted)" id="del-wp-id"></span>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-danger" id="del-wp-confirm-btn" onclick="executeDeleteWebProduct()">Delete Permanently</button>
+      <button class="btn btn-secondary" onclick="closeModal('delete-web-product-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE CATEGORIES MODAL -->
+<div class="modal-overlay" id="manage-categories-modal">
+  <div class="modal" style="max-width:460px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="margin:0">Manage Categories</h3>
+      <button class="btn btn-primary btn-sm" onclick="openAddCategoryFromManage()">+ Add New</button>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:14px">Categories with products cannot be deleted until all their products are removed first.</p>
+    <div id="category-manage-list"></div>
+    <div class="form-actions" style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="closeModal('manage-categories-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- BULK ADD PRODUCTS MODAL -->
 <div class="modal-overlay" id="bulk-add-modal">
   <div class="modal" style="max-width:540px">
