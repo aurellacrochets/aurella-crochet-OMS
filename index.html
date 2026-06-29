@@ -1347,12 +1347,14 @@ function showLoginScreen() {
   document.getElementById('login-screen').classList.add('visible');
   document.getElementById('logout-btn').style.display = 'none';
   document.getElementById('login-password').value = '';
+  document.getElementById('nav-webproducts').style.display = 'none';
 }
 
 function hideLoginScreen() {
   document.getElementById('login-screen').classList.remove('visible');
   document.getElementById('logout-btn').style.display = '';
   if (AUTH_USER) document.getElementById('logout-btn').textContent = `⎋ Sign Out (${AUTH_USER})`;
+  document.getElementById('nav-webproducts').style.display = '';
 }
 
 function skipLogin() {
@@ -1362,6 +1364,7 @@ function skipLogin() {
   hideLoginScreen();
   document.getElementById('logout-btn').style.display = 'none';
   loadDemoData();
+  document.getElementById('nav-webproducts').style.display = 'none';
 }
 
 // Enter key on password field triggers login
@@ -2479,7 +2482,15 @@ function navigate(page) {
   document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
   if (page==='neworder') initNewOrderPage();
   if (page==='deleteorders') renderDeleteList();
-  if (page==='webproducts') initWebProductsPage();
+  if (page==='webproducts') {
+  if (!AUTH_TOKEN) {
+    document.getElementById('web-products-status').innerHTML =
+      '<span style="color:var(--red)">⚠ You must be signed in to manage web products.</span>';
+    document.getElementById('web-products-grid').innerHTML = '';
+    return;
+  }
+  initWebProductsPage();
+}
   if (page==='products') renderProductsTable();
   localStorage.setItem('aurella_last_page', page);
   window.scrollTo(0,0); closeSidebar();
