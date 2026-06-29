@@ -629,6 +629,22 @@ h3 { font-size: 16px; font-weight: 600; }
 /* ─── WEB PRODUCTS ───────────────────────────────────────── */
 .web-product-card:hover { transform: translateY(-2px); transition: transform .15s; }
 
+/* ─── OVERVIEW ───────────────────────────────────────────── */
+.overview-stat-row { display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-radius:var(--radius-sm); cursor:pointer; transition:background .15s; }
+.overview-stat-row:hover { background:var(--surface2); }
+.overview-stat-val { font-size:18px; font-weight:700; }
+.overview-stat-val.blue   { color:var(--blue); }
+.overview-stat-val.yellow { color:var(--yellow); }
+.overview-stat-val.green  { color:var(--green); }
+.overview-stat-val.orange { color:var(--orange); }
+.overview-stat-val.red    { color:var(--red); }
+.overview-stat-val.accent { color:var(--accent2); }
+.overview-period-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+@media (max-width:768px) {
+  #page-overview > div:nth-child(3) { grid-template-columns:1fr !important; }
+  #page-overview > div:nth-child(4) { grid-template-columns:1fr !important; }
+}
+
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
@@ -748,50 +764,128 @@ h3 { font-size: 16px; font-weight: 600; }
 
 <!-- ═══ OVERVIEW ═════════════════════════════════════════════ -->
 <section class="page active" id="page-overview">
-  <div class="page-header">
-    <h2>Overview</h2>
-    <p>Live snapshot of Aurella orders</p>
-  </div>
-  <div class="cards-grid">
-    <div class="card"><div class="card-label">Total Orders</div><div class="card-value accent" id="stat-total">—</div></div>
-    <div class="card"><div class="card-label">Confirmed</div><div class="card-value blue" id="stat-confirmed">—</div></div>
-    <div class="card"><div class="card-label">In Progress</div><div class="card-value yellow" id="stat-inprogress">—</div></div>
-    <div class="card"><div class="card-label">Ready</div><div class="card-value" style="color:var(--accent2)" id="stat-ready">—</div></div>
-    <div class="card"><div class="card-label">In Transit</div><div class="card-value green" id="stat-intransit">—</div></div>
-    <div class="card"><div class="card-label">Delivered</div><div class="card-value" style="color:#6ee7b7" id="stat-delivered">—</div></div>
-    <div class="card"><div class="card-label">RTO</div><div class="card-value orange" id="stat-rto">—</div></div>
-    <div class="card"><div class="card-label">Cancelled</div><div class="card-value red" id="stat-cancelled">—</div></div>
-    <div class="card"><div class="card-label">Paid</div><div class="card-value green" id="stat-paid">—</div></div>
-    <div class="card"><div class="card-label">Unpaid</div><div class="card-value red" id="stat-unpaid">—</div></div>
-  </div>
-  <div class="quick-actions">
-    <div class="quick-action" onclick="navigate('neworder')">
-      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-      Add New Order
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <div>
+      <h2>Ordering Overview</h2>
+      <p>Sales performance and order insights</p>
     </div>
-    <div class="quick-action" onclick="filterAndGo('In Transit')">
-      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      In Transit
-    </div>
-    <div class="quick-action" onclick="filterAndGo('','Not Paid')">
-      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-      Unpaid Orders
-    </div>
-    <div class="quick-action" onclick="filterAndGo('Ready')">
-      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
-      Ready Orders
-    </div>
-    <div class="quick-action" onclick="loadData()">
-      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-      Refresh
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm overview-period-btn active" data-period="month" onclick="setOverviewPeriod('month',this)">This Month</button>
+      <button class="btn btn-secondary btn-sm overview-period-btn" data-period="lastmonth" onclick="setOverviewPeriod('lastmonth',this)">Last Month</button>
+      <button class="btn btn-secondary btn-sm overview-period-btn" data-period="all" onclick="setOverviewPeriod('all',this)">All Time</button>
+      <div class="quick-action" onclick="loadData()" style="padding:5px 12px;font-size:12px">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Refresh
+      </div>
     </div>
   </div>
+
+  <!-- TOP STAT CARDS -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:20px">
+    <div class="card" style="border-left:3px solid var(--accent)">
+      <div class="card-label">THIS PERIOD — REVENUE</div>
+      <div class="card-value accent" id="stat-revenue" style="font-size:24px">—</div>
+      <div style="font-size:12px;color:var(--muted)" id="stat-total-sub">— orders</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--blue)">
+      <div class="card-label">TODAY'S REVENUE</div>
+      <div class="card-value blue" id="stat-today-revenue" style="font-size:24px">—</div>
+      <div style="font-size:12px;color:var(--muted)" id="stat-today-sub">— orders today</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green)">
+      <div class="card-label">PAID</div>
+      <div class="card-value green" id="stat-paid" style="font-size:24px">—</div>
+      <div style="font-size:12px;color:var(--muted)" id="stat-paid-amt">₹0 collected</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--red)">
+      <div class="card-label">UNPAID</div>
+      <div class="card-value red" id="stat-unpaid" style="font-size:24px">—</div>
+      <div style="font-size:12px;color:var(--muted)" id="stat-unpaid-amt">₹0 pending</div>
+    </div>
+  </div>
+
+  <!-- CHART + ORDER STATUS -->
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:16px;margin-bottom:20px">
+    <!-- Daily Orders Chart -->
+    <div class="section" style="margin-bottom:0">
+      <div class="section-title">Orders Per Day <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--muted)" id="chart-period-label">This Month</span></div>
+      <div style="position:relative;height:220px">
+        <canvas id="orders-chart"></canvas>
+      </div>
+    </div>
+    <!-- Order Status Breakdown -->
+    <div class="section" style="margin-bottom:0">
+      <div class="section-title">Order Status</div>
+      <div style="display:flex;flex-direction:column;gap:8px" id="status-breakdown">
+        <div class="overview-stat-row" onclick="filterAndGo('Confirmed')"><span class="badge badge-confirmed">Confirmed</span><span class="overview-stat-val blue" id="stat-confirmed">—</span></div>
+        <div class="overview-stat-row" onclick="filterAndGo('In Progress')"><span class="badge badge-inprogress">In Progress</span><span class="overview-stat-val yellow" id="stat-inprogress">—</span></div>
+        <div class="overview-stat-row" onclick="filterAndGo('Ready')"><span class="badge badge-ready">Ready</span><span class="overview-stat-val" style="color:var(--accent2)" id="stat-ready">—</span></div>
+        <div class="overview-stat-row" onclick="filterAndGo('In Transit')"><span class="badge badge-intransit">In Transit</span><span class="overview-stat-val green" id="stat-intransit">—</span></div>
+        <div class="overview-stat-row" onclick="filterAndGo('Delivered')"><span class="badge badge-delivered">Delivered</span><span class="overview-stat-val" style="color:#6ee7b7" id="stat-delivered">—</span></div>
+        <div class="overview-stat-row" onclick="filterAndGo('RTO - In Transit')"><span class="badge badge-rto">RTO</span><span class="overview-stat-val orange" id="stat-rto">—</span></div>
+        <div class="overview-stat-row" onclick="filterAndGo('Cancelled')"><span class="badge badge-cancelled">Cancelled</span><span class="overview-stat-val red" id="stat-cancelled">—</span></div>
+        <div class="overview-stat-row" style="cursor:default;border-top:1px solid var(--border);padding-top:8px;margin-top:4px"><span style="color:var(--muted);font-size:12px">Total Orders</span><span class="overview-stat-val accent" id="stat-total">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELIVERY PERFORMANCE + QUICK ACTIONS -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+    <div class="section" style="margin-bottom:0">
+      <div class="section-title">Delivery Performance</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--surface2);border-radius:var(--radius);padding:16px;display:flex;align-items:center;gap:14px">
+          <div style="width:52px;height:52px;border-radius:50%;background:conic-gradient(var(--green) calc(var(--pct,0)*1%),var(--border) 0);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--green)" id="delivered-pct-txt">0%</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Delivered</div>
+            <div style="font-size:20px;font-weight:700;color:#6ee7b7" id="stat-delivered-count">—</div>
+            <div style="font-size:11px;color:var(--muted)">orders</div>
+          </div>
+        </div>
+        <div style="background:var(--surface2);border-radius:var(--radius);padding:16px;display:flex;align-items:center;gap:14px">
+          <div style="width:52px;height:52px;border-radius:50%;background:conic-gradient(var(--orange) calc(var(--rto-pct,0)*1%),var(--border) 0);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--orange)" id="rto-pct-txt">0%</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">RTO</div>
+            <div style="font-size:20px;font-weight:700;color:var(--orange)" id="stat-rto-count">—</div>
+            <div style="font-size:11px;color:var(--muted)">orders</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="section" style="margin-bottom:0">
+      <div class="section-title">Quick Actions</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="quick-action" onclick="navigate('neworder')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+          New Order
+        </div>
+        <div class="quick-action" onclick="filterAndGo('In Transit')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          In Transit
+        </div>
+        <div class="quick-action" onclick="filterAndGo('','Not Paid')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          Unpaid
+        </div>
+        <div class="quick-action" onclick="filterAndGo('Ready')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+          Ready
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECENT ORDERS -->
   <div class="section">
     <div class="section-title">Recent Orders <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--muted)">Last 10</span></div>
-        <div class="table-wrap">
+    <div class="table-wrap">
       <table>
-        <thead><tr><th>Order ID</th><th>Customer</th><th>Status</th><th>Payment</th><th>Updated</th></tr></thead>
-        <tbody id="recent-orders-body"><tr><td colspan="5" class="table-empty">Loading…</td></tr></tbody>
+        <thead><tr><th>Order ID</th><th>Customer</th><th>Status</th><th>Payment</th><th>Amount</th><th>Updated</th></tr></thead>
+        <tbody id="recent-orders-body"><tr><td colspan="6" class="table-empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1475,19 +1569,87 @@ function fmtAmount(n) {
 // ═══════════════════════════════════════════════════════════
 // OVERVIEW
 // ═══════════════════════════════════════════════════════════
-function renderOverview() {
-  const s = st => allOrders.filter(o => o.OrderStatus === st).length;
-  document.getElementById('stat-total').textContent = allOrders.length;
-  document.getElementById('stat-confirmed').textContent = s('Confirmed');
-  document.getElementById('stat-inprogress').textContent = s('In Progress');
-  document.getElementById('stat-ready').textContent = s('Ready');
-  document.getElementById('stat-intransit').textContent = s('In Transit');
-  document.getElementById('stat-delivered').textContent = s('Delivered');
-  document.getElementById('stat-rto').textContent = s('RTO - In Transit');
-  document.getElementById('stat-cancelled').textContent = s('Cancelled');
-  document.getElementById('stat-paid').textContent = allOrders.filter(o=>o.PaymentStatus==='Paid').length;
-  document.getElementById('stat-unpaid').textContent = allOrders.filter(o=>o.PaymentStatus!=='Paid').length;
+let overviewPeriod = 'month';
+let ordersChartInstance = null;
 
+function setOverviewPeriod(period, btn) {
+  overviewPeriod = period;
+  document.querySelectorAll('.overview-period-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderOverview();
+}
+
+function getFilteredForPeriod(orders) {
+  const now = new Date();
+  if (overviewPeriod === 'month') {
+    return orders.filter(o => {
+      const d = new Date(o.CreatedAt);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+  }
+  if (overviewPeriod === 'lastmonth') {
+    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return orders.filter(o => {
+      const d = new Date(o.CreatedAt);
+      return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+    });
+  }
+  return orders; // all time
+}
+
+function renderOverview() {
+  const periodOrders = getFilteredForPeriod(allOrders);
+  const s = st => periodOrders.filter(o => o.OrderStatus === st).length;
+
+  // Revenue helpers
+  const revenue = orders => orders.reduce((sum, o) => sum + orderAmount(o.OrderID), 0);
+
+  // Top cards
+  document.getElementById('stat-total').textContent = periodOrders.length;
+  document.getElementById('stat-revenue').textContent = fmtAmount(revenue(periodOrders));
+  document.getElementById('stat-total-sub').textContent = `${periodOrders.length} orders`;
+
+  const todayStr = new Date().toDateString();
+  const todayOrders = allOrders.filter(o => new Date(o.CreatedAt).toDateString() === todayStr);
+  document.getElementById('stat-today-revenue').textContent = fmtAmount(revenue(todayOrders));
+  document.getElementById('stat-today-sub').textContent = `${todayOrders.length} orders today`;
+
+  const paidOrders   = periodOrders.filter(o => o.PaymentStatus === 'Paid');
+  const unpaidOrders = periodOrders.filter(o => o.PaymentStatus !== 'Paid');
+  document.getElementById('stat-paid').textContent   = paidOrders.length;
+  document.getElementById('stat-paid-amt').textContent   = fmtAmount(revenue(paidOrders)) + ' collected';
+  document.getElementById('stat-unpaid').textContent = unpaidOrders.length;
+  document.getElementById('stat-unpaid-amt').textContent = fmtAmount(revenue(unpaidOrders)) + ' pending';
+
+  // Status breakdown
+  document.getElementById('stat-confirmed').textContent  = s('Confirmed');
+  document.getElementById('stat-inprogress').textContent = s('In Progress');
+  document.getElementById('stat-ready').textContent      = s('Ready');
+  document.getElementById('stat-intransit').textContent  = s('In Transit');
+  document.getElementById('stat-delivered').textContent  = s('Delivered');
+  document.getElementById('stat-rto').textContent        = s('RTO - In Transit');
+  document.getElementById('stat-cancelled').textContent  = s('Cancelled');
+
+  // Delivery performance
+  const totalClosed = s('Delivered') + s('RTO - In Transit') + s('Cancelled');
+  const deliveredPct = totalClosed ? Math.round((s('Delivered') / totalClosed) * 100) : 0;
+  const rtoPct       = totalClosed ? Math.round((s('RTO - In Transit') / totalClosed) * 100) : 0;
+  document.getElementById('stat-delivered-count').textContent = s('Delivered');
+  document.getElementById('stat-rto-count').textContent       = s('RTO - In Transit');
+  document.getElementById('delivered-pct-txt').textContent    = deliveredPct + '%';
+  document.getElementById('rto-pct-txt').textContent          = rtoPct + '%';
+  document.getElementById('delivered-pct-txt').parentElement.style.setProperty('--pct', deliveredPct);
+  document.getElementById('rto-pct-txt').parentElement.style.setProperty('--rto-pct', rtoPct);
+
+  // Chart period label
+  const labels = { month:'This Month', lastmonth:'Last Month', all:'All Time' };
+  const chartLabel = document.getElementById('chart-period-label');
+  if (chartLabel) chartLabel.textContent = labels[overviewPeriod] || '';
+
+  // Daily orders bar chart
+  renderOrdersChart(periodOrders);
+
+  // Recent orders
   const recent = [...allOrders].sort((a,b)=>new Date(b.UpdatedAt)-new Date(a.UpdatedAt)).slice(0,10);
   document.getElementById('recent-orders-body').innerHTML = recent.map(o=>`
     <tr class="order-row" onclick="openOrder('${o.OrderID}')">
@@ -1495,8 +1657,56 @@ function renderOverview() {
       <td>${esc(o.CustomerName)}</td>
       <td>${statusBadge(o.OrderStatus)}</td>
       <td>${payBadge(o.PaymentStatus)}</td>
+      <td class="amount-cell">${fmtAmount(orderAmount(o.OrderID))}</td>
       <td style="color:var(--muted);font-size:12px">${fmtDate(o.UpdatedAt)}</td>
-    </tr>`).join('') || `<tr><td colspan="5" class="table-empty">No orders yet</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="6" class="table-empty">No orders yet</td></tr>`;
+}
+
+function renderOrdersChart(periodOrders) {
+  const canvas = document.getElementById('orders-chart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  // Build day buckets
+  const buckets = {};
+  periodOrders.forEach(o => {
+    const d = new Date(o.CreatedAt);
+    const key = `${d.getDate()} ${d.toLocaleString('en-IN',{month:'short'})}`;
+    buckets[key] = (buckets[key] || 0) + 1;
+  });
+
+  // Sort by date
+  const sorted = Object.entries(buckets).sort((a, b) => {
+    const parse = s => { const [d,m] = s.split(' '); return new Date(`${m} ${d} ${new Date().getFullYear()}`); };
+    return parse(a[0]) - parse(b[0]);
+  });
+
+  const chartLabels = sorted.map(x => x[0]);
+  const chartData   = sorted.map(x => x[1]);
+
+  if (ordersChartInstance) ordersChartInstance.destroy();
+  ordersChartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [{
+        label: 'Orders',
+        data: chartData,
+        backgroundColor: 'rgba(192,132,252,0.5)',
+        borderColor: 'rgba(192,132,252,1)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#888899', font: { size: 11 } }, grid: { color: '#2e2e38' } },
+        y: { ticks: { color: '#888899', font: { size: 11 }, stepSize: 1 }, grid: { color: '#2e2e38' }, beginAtZero: true }
+      }
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2941,6 +3151,7 @@ async function submitBulkEdit() {
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
   window._dateFrom = '';
   window._dateTo   = '';
